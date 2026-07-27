@@ -34,7 +34,7 @@ class ScheduledMessage(Base, TimestampMixin):
     )
     scheduled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[ScheduledMessageStatus] = mapped_column(
-        Enum(ScheduledMessageStatus),
+        Enum(ScheduledMessageStatus, native_enum=False),
         nullable=False,
         default=ScheduledMessageStatus.pending,
     )

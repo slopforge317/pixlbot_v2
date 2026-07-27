@@ -8,7 +8,6 @@ from api import create_app
 from bot import create_bot, create_dispatcher, setup_bot_webhook, shutdown_bot_webhook
 from core.config import settings
 from core.logging import setup_logging
-from db.session import create_tables
 from fastapi import FastAPI
 from loguru import logger
 from services.funnel import funnel_message_loop, seed_funnel_steps
@@ -20,9 +19,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """FastAPI lifespan: startup and shutdown events."""
     setup_logging()
     logger.info("Starting pixlbot API...")
-
-    await create_tables()
-    logger.info("Database initialized")
 
     await seed_funnel_steps()
     logger.info("Funnel steps seeded")
@@ -101,9 +97,6 @@ async def run_bot() -> None:
     """Run Telegram bot polling (standalone mode)."""
     setup_logging()
     logger.info("Starting pixlbot bot...")
-
-    await create_tables()
-    logger.info("Database initialized")
 
     bot = create_bot()
     dp = create_dispatcher()

@@ -12,11 +12,11 @@ class FunnelStep(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     trigger_event: Mapped[FunnelTriggerEvent] = mapped_column(
-        Enum(FunnelTriggerEvent), nullable=False
+        Enum(FunnelTriggerEvent, native_enum=False), nullable=False
     )
     delay_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     condition: Mapped[FunnelCondition | None] = mapped_column(
-        Enum(FunnelCondition), nullable=True
+        Enum(FunnelCondition, native_enum=False), nullable=True
     )
     message_text: Mapped[str] = mapped_column(Text, nullable=False)
     button_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
