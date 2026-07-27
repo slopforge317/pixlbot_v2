@@ -1,0 +1,151 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Onest:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 12px;
+  --background: var(--color-paper);
+  --foreground: var(--color-graphite);
+  --card: var(--color-white);
+  --card-foreground: var(--color-graphite);
+  --popover: var(--color-white);
+  --popover-foreground: var(--color-graphite);
+  --primary: var(--color-ink);
+  --primary-foreground: var(--color-white);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: var(--color-graphite);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: var(--color-slate);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: var(--color-graphite);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--color-silver);
+  --input: var(--color-silver);
+  --ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --spacing: 1px;
+  --spacing-4: 4px;
+  --spacing-5: 5px;
+  --spacing-6: 6px;
+  --spacing-8: 8px;
+  --spacing-10: 10px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-24: 24px;
+  --spacing-28: 28px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-80: 80px;
+  --spacing-card: var(--spacing-24);
+  --spacing-section: 96px;
+  --container-page: 1200px;
+  --container-mini-app: 430px;
+  --font-onest: "Onest", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-inter: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-onest);
+  --font-heading: var(--font-onest);
+  --font-technical: var(--font-inter);
+  --color-ink: #101010;
+  --color-action-blue: #0099ff;
+  --color-white: #ffffff;
+  --color-paper: #f4f4f4;
+  --color-graphite: #242424;
+  --color-slate: #6b7280;
+  --color-stone: #898989;
+  --color-silver: #e5e7eb;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.4;
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.5;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5;
+  --text-subheading: 1.125rem;
+  --text-subheading--line-height: 1.4;
+  --text-heading-sm: 1.25rem;
+  --text-heading-sm--line-height: 1.3;
+  --text-heading: 1.5rem;
+  --text-heading--line-height: 1.3;
+  --text-heading-lg: 3rem;
+  --text-heading-lg--line-height: 1.1;
+  --text-display: 4rem;
+  --text-display--line-height: 1.1;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-tag: 9999px;
+  --radius-card: var(--radius);
+  --radius-input: 8px;
+  --radius-button: 9999px;
+  --radius-button-rect: 8px;
+  --shadow-sm: rgba(36, 36, 36, 0.7) 0px 1px 5px -4px, rgba(36, 36, 36, 0.08) 0px 4px 12px -8px;
+  --shadow-subtle: rgba(255, 255, 255, 0.15) 0px 2px 0px 0px inset;
+  --shadow-sm-2: rgba(19, 19, 22, 0.7) 0px 1px 5px -4px, rgba(34, 42, 53, 0.08) 0px 4px 12px -8px;
+  --shadow-sm-3: rgba(19, 19, 22, 0.7) 0px 1px 5px -4px, rgba(34, 42, 53, 0.08) 0px 6px 16px -10px;
+  --shadow-sm-4: rgba(34, 42, 53, 0.05) 0px 4px 8px 0px;
+  --shadow-subtle-2: rgb(255, 255, 255) 0px 2px 0px 0px inset;
+  --shadow-subtle-3: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.06) 0px 1px 2px 0px;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
+  }
+}
