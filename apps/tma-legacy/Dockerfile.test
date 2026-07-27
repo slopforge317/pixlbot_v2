@@ -1,0 +1,32 @@
+# Dockerfile for Telegram Test Environment (HTTP-only)
+
+# Stage 1: Build
+FROM node:18-alpine as build
+WORKDIR /app
+
+ARG VITE_API_URL=/api
+ARG VITE_MOCK_INIT_DATA=
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_MOCK_INIT_DATA=$VITE_MOCK_INIT_DATA
+
+# Copy dependency files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --silent
+
+# Copy source code
+COPY . .
+
+# Build with test mode
+RUN npm run build -- --mode test
+
+# Stage 2: Serve with nginx
+FROM nginx:stable-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.test.conf /etc/nginx/conf.d/default.conf
+
+# HTTP only
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
