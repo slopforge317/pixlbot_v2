@@ -16,3 +16,19 @@
 Проект переносится из нескольких независимых репозиториев в один чистый локальный
 монорепозиторий. Актуальные команды запуска будут добавлены после нормализации
 Docker Compose.
+
+## Быстрый старт
+
+```powershell
+.\scripts\setup.ps1
+.\scripts\dev.ps1
+```
+
+Подробности: [docs/development.md](docs/development.md).
+
+## Проверки
+
+```powershell
+.\scripts\check.ps1
+.\scripts\test.ps1
+```

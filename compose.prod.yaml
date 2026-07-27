@@ -1,0 +1,14 @@
+name: pixlbot-prod
+
+services:
+  tma:
+    build:
+      context: ./apps/tma
+      args:
+        VITE_API_URL: /api
+    ports:
+      - ${TMA_PORT:-8080}:80
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

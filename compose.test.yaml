@@ -1,0 +1,48 @@
+name: pixlbot-test
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: pixlbot
+      POSTGRES_DB: pixlbot_test
+      POSTGRES_PASSWORD: pixlbot_test
+    ports:
+      - 127.0.0.1:${TEST_POSTGRES_PORT:-5433}:5432
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U pixlbot -d pixlbot_test
+
+  migrate:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pixlbot:pixlbot_test@postgres:5432/pixlbot_test
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pixlbot:pixlbot_test@postgres:5432/pixlbot_test
+      TELEGRAM_TEST_MODE: "true"
+      WELCOME_BONUS_CREDITS: "100"
+    ports:
+      - 127.0.0.1:${BACKEND_PORT:-8000}:8000
+
+  seed:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pixlbot:pixlbot_test@postgres:5432/pixlbot_test
+
+  tma:
+    build:
+      context: ./apps/tma
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_MOCK_INIT_DATA: ${VITE_MOCK_INIT_DATA:-}
+    ports:
+      - ${TMA_PORT:-8080}:80
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_test_data:

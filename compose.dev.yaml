@@ -1,0 +1,69 @@
+name: pixlbot-dev
+
+services:
+  postgres:
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+  backend:
+    command:
+      - python
+      - -m
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+    ports:
+      - 127.0.0.1:${BACKEND_PORT:-8000}:8000
+    volumes:
+      - ./apps/backend/app:/app/app
+      - ./apps/backend/scripts:/app/scripts
+      - backend_dev_logs:/app/logs
+
+  tma:
+    image: node:24.18.0-alpine
+    working_dir: /app
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-/api}
+      VITE_DEV_API_PROXY_TARGET: http://backend:8000
+      VITE_MOCK_INIT_DATA: ${VITE_MOCK_INIT_DATA:-}
+    command:
+      - sh
+      - -c
+      - corepack enable && pnpm install --frozen-lockfile && pnpm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - 127.0.0.1:${TMA_DEV_PORT:-5173}:5173
+    volumes:
+      - ./apps/tma:/app
+      - tma_node_modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN?Set NGROK_AUTHTOKEN in .env}
+    command:
+      - http
+      - http://tma:5173
+      - --log=stdout
+    ports:
+      - 127.0.0.1:${NGROK_WEB_PORT:-4040}:4040
+    depends_on:
+      tma:
+        condition: service_started
+    profiles:
+      - tunnel
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+  backend_dev_logs:
+  tma_node_modules:
