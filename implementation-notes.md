@@ -91,5 +91,27 @@
   TypeScript check, обе frontend-сборки и четыре Compose-конфигурации.
 - 64 backend unit tests, не требующих PostgreSQL, проходят.
 - Initial migration успешно компилируется Alembic в PostgreSQL SQL offline.
-- Полный `alembic upgrade head`, seed и PostgreSQL integration tests пока не
-  выполнены: Docker Desktop на машине не запущен.
+- До запуска Docker Desktop PostgreSQL-проверки были временно отложены; ниже
+  зафиксирован их итоговый результат.
+
+## Проверка с PostgreSQL
+
+- Docker Desktop запущен, создан новый изолированный test volume.
+- `alembic upgrade head` успешно создал схему на PostgreSQL 16.
+- `alembic current` показывает `20260727_0001 (head)`.
+- `alembic check` не обнаруживает расхождений между migration и ORM metadata.
+- Оба seed script успешно заполнили чистую базу.
+- В процессе проверки из seed scripts удалены `create_all` и ручные
+  `ALTER TABLE`: seed теперь предполагает предварительный `alembic upgrade head`
+  и не управляет схемой самостоятельно.
+- Первый полный pytest завершился с результатом 151 passed / 3 failed. Все три
+  сбоя оказались устаревшими ожиданиями Telegram-текстов: tests форматировали
+  `balance`, тогда как handlers уже используют `pro_gens` и `basic_gens`.
+- Tests обновлены под фактический контракт сообщений. Одновременно
+  `datetime.utcnow()` заменён на явное naive UTC значение без deprecation warning.
+- `scripts/test.ps1` теперь создаёт отдельную базу `pixlbot_pytest`, поэтому
+  pytest не разрушает базу, используемую для проверки Alembic и seed.
+- После обновления ожиданий полный `scripts/test.ps1` проходит: 154 tests passed.
+- Compose обнаруживает старый orphan container `pixlbot-test-tma` из исходного
+  проекта. Он намеренно не удалён, поскольку новый монорепозиторий не должен
+  изменять или очищать старое окружение без отдельного решения.
