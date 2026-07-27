@@ -18,8 +18,13 @@ if ($LASTEXITCODE -ne 0) {
     throw "Unable to start the test PostgreSQL service."
 }
 
+docker @composeArgs exec -T postgres sh -c "dropdb --if-exists -U pixlbot pixlbot_pytest && createdb -U pixlbot pixlbot_pytest"
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to recreate the isolated pixlbot_pytest database."
+}
+
 $testPort = if ($env:TEST_POSTGRES_PORT) { $env:TEST_POSTGRES_PORT } else { "5433" }
-$env:TEST_DATABASE_URL = "postgresql+asyncpg://pixlbot:pixlbot_test@localhost:$testPort/pixlbot_test"
+$env:TEST_DATABASE_URL = "postgresql+asyncpg://pixlbot:pixlbot_test@localhost:$testPort/pixlbot_pytest"
 $env:PYTHONPATH = "app"
 
 Push-Location (Join-Path $projectRoot "apps/backend")

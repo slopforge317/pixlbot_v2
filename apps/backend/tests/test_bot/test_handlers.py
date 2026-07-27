@@ -66,7 +66,8 @@ async def test_cmd_start_existing_user(
     # Verify welcome back message with reply_markup
     expected_text = WELCOME_BACK.format(
         first_name=mock_message.from_user.first_name,
-        balance=0,
+        pro_gens=0,
+        basic_gens=0,
     )
     mock_message.answer.assert_called_once_with(expected_text, reply_markup=ANY)
 
@@ -133,7 +134,7 @@ async def test_on_balance(
 
     await on_balance(mock_callback, db_session)
 
-    expected_text = BALANCE_MENU_TEXT.format(balance=0)
+    expected_text = BALANCE_MENU_TEXT.format(pro_gens=0, basic_gens=0)
     mock_callback.message.edit_text.assert_called_once_with(
         expected_text, reply_markup=ANY
     )
@@ -148,7 +149,7 @@ async def test_on_balance_unregistered_user(
     """Test menu:balance callback for unregistered user shows zero balance."""
     await on_balance(mock_callback, db_session)
 
-    expected_text = BALANCE_MENU_TEXT.format(balance=0)
+    expected_text = BALANCE_MENU_TEXT.format(pro_gens=0, basic_gens=0)
     mock_callback.message.edit_text.assert_called_once_with(
         expected_text, reply_markup=ANY
     )

@@ -9,7 +9,7 @@ Handles the full generation lifecycle:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from bot import create_bot
@@ -334,7 +334,7 @@ async def _handle_success(
         media_type: "image" or "video"
     """
     job.status = JobStatus.done
-    job.provider_complete_time = datetime.utcnow()
+    job.provider_complete_time = datetime.now(UTC).replace(tzinfo=None)
 
     if result.result_urls:
         job.success_url_asset = result.result_urls[0]

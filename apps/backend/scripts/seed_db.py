@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 # Add app to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
 from db.models.ai_model import AIModel  # noqa: E402
 from db.models.pricing_variant import PricingVariant  # noqa: E402
 from db.models.provider import Provider  # noqa: E402
-from db.session import async_session_maker, create_tables, engine  # noqa: E402
+from db.session import async_session_maker, engine  # noqa: E402
 
 
 def load_api_parameters() -> list[dict[str, Any]]:
@@ -270,25 +270,6 @@ async def main() -> None:
 
     print("Loading seed prices...")
     prices = load_seed_prices()
-
-    print("Creating tables if needed...")
-    await create_tables()
-
-    print("Running migrations...")
-    async with engine.begin() as conn:
-        await conn.execute(
-            text(
-                "ALTER TABLE providers "
-                "ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"
-            )
-        )
-        await conn.execute(
-            text(
-                "ALTER TABLE ai_models "
-                "ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"
-            )
-        )
-    print("Migrations done.")
 
     print("Seeding providers, models, and pricing variants...")
     await seed_data(api_params, prices)

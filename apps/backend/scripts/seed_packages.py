@@ -20,7 +20,7 @@ from sqlalchemy import select
 sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
 
 from db.models.credit_package import CreditPackage  # noqa: E402
-from db.session import async_session_maker, create_tables, engine  # noqa: E402
+from db.session import async_session_maker, engine  # noqa: E402
 
 
 def load_packages() -> list[dict[str, Any]]:
@@ -43,9 +43,6 @@ async def main() -> None:
 
     print("Loading packages from YAML...")
     packages = load_packages()
-
-    print("Creating tables if needed...")
-    await create_tables()
 
     print("Seeding credit packages...")
     async with async_session_maker() as session:
