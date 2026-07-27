@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from async_yookassa import YooKassaClient
+from async_yookassa.enums.payment_subject import (
+    PaymentModeEnum,
+    PaymentSubjectEnum,
+)
 from async_yookassa.models.payment.amount import Amount
 from async_yookassa.models.payment.confirmation import (
     ConfirmationType,
@@ -68,8 +72,8 @@ async def create_yookassa_payment(
                 amount=amount,
                 vat_code=settings.yookassa_vat_code,
                 quantity="1",
-                payment_subject="service",
-                payment_mode="full_payment",
+                payment_subject=PaymentSubjectEnum.SERVICE,
+                payment_mode=PaymentModeEnum.FULL_PAYMENT,
             )
         ],
         tax_system_code=settings.yookassa_tax_system_code,

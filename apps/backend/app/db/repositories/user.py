@@ -1,9 +1,12 @@
+from typing import Any, cast
+
 from core.logging import log_repository
 from db.models.transaction import Transaction
 from db.models.user import User
 from db.repositories.base import BaseRepository
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 
 
 class UserRepository(BaseRepository[User]):
@@ -52,7 +55,7 @@ class UserRepository(BaseRepository[User]):
             )
             .on_conflict_do_nothing(index_elements=["telegram_user_id"])
         )
-        result = await self.session.execute(stmt)
+        result = cast(CursorResult[Any], await self.session.execute(stmt))
         created = result.rowcount > 0
 
         user = await self.get_by_telegram_id(telegram_user_id)

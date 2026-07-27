@@ -1,21 +1,26 @@
 """FastAPI application factory."""
 
-from api.middleware import RequestLoggingMiddleware
-from api.routes import (
-    generations_router,
-    packages_router,
-    payments_router,
-    providers_router,
-    storage_router,
-    users_router,
-    webhook_router,
-)
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 
 def create_app() -> FastAPI:
-    """Create and configure FastAPI application."""
+    """Create and configure FastAPI application.
+
+    Application-specific imports stay inside the factory so importing an API
+    schema does not initialize every route and create circular dependencies.
+    """
+    from api.middleware import RequestLoggingMiddleware
+    from api.routes import (
+        generations_router,
+        packages_router,
+        payments_router,
+        providers_router,
+        storage_router,
+        users_router,
+        webhook_router,
+    )
+    from fastapi.middleware.cors import CORSMiddleware
+
     app = FastAPI(
         title="pixlbot API",
         description="Backend API for pixlbot TMA",

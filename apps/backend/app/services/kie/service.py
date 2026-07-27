@@ -89,7 +89,7 @@ class KieService:
         if status.state == KieTaskState.fail:
             raise KieTaskFailedError(
                 message=status.failMsg or "Task failed",
-                fail_code=status.failCode,
+                fail_code=status.failCode or "unknown",
             )
 
         if status.state == KieTaskState.success:

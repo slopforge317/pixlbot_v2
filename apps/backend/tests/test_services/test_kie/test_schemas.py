@@ -27,7 +27,7 @@ def test_create_task_request_with_dict() -> None:
 
 
 def test_create_task_request_preserves_all_params() -> None:
-    """Test CreateTaskRequest preserves all input params including model-specific ones."""
+    """CreateTaskRequest preserves common and model-specific input parameters."""
     request = CreateTaskRequest(
         model="sora-2-pro-text-to-video",
         input={
