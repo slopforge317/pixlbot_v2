@@ -20,10 +20,10 @@ datasources:
     type: postgres
     access: proxy
     uid: postgres
-    url: pixlbot-db:5432
-    user: pixlbot
+    url: postgres:5432
+    user: $POSTGRES_USER
     jsonData:
-      database: pixlbot
+      database: $POSTGRES_DB
       sslmode: disable
       maxOpenConns: 5
       maxIdleConns: 2
