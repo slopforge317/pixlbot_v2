@@ -1,0 +1,669 @@
+providers:
+- provider: Nano Banana 2
+  sort_order: 10
+  status: Pro
+  model:
+    type: string
+    required: true
+    values:
+    - nano-banana-2
+    ui_label: Nano Banana 2
+    sort_order: 10
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 20000
+        ui_label: Запрос
+        ui_order: 1
+      image_input:
+        type: array
+        required: false
+        max_images: 14
+        max_image_size_mb: 30
+        ui_label: Фото для референса
+        ui_order: 2
+      aspect_ratio:
+        type: string
+        required: false
+        values:
+        - '1:1'
+        - '2:3'
+        - '3:2'
+        - '3:4'
+        - '4:3'
+        - '4:5'
+        - '5:4'
+        - '9:16'
+        - '16:9'
+        - '21:9'
+        - auto
+        default: auto
+        ui_label: Соотношение сторон
+        ui_order: 3
+      resolution:
+        type: string
+        required: false
+        values:
+        - 2K
+        - 4K
+        variant: false
+        default: 2K
+        ui_label: Разрешение
+        ui_order: 4
+      output_format:
+        type: string
+        required: false
+        values:
+        - png
+        - jpg
+        default: png
+        ui_label: Формат файла
+        ui_order: 5
+      google_search:
+        type: boolean
+        required: true
+        variant: false
+        default: false
+        ui_label: Использовать Google поиск для генерации
+        ui_order: 6
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: Nano Banana Pro
+  sort_order: 20
+  status: Pro
+  model:
+    type: string
+    required: true
+    values:
+    - nano-banana-pro
+    ui_label: Nano Banana Pro
+    sort_order: 10
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 20000
+        ui_label: Запрос
+        ui_order: 1
+      image_input:
+        type: array
+        required: false
+        max_images: 8
+        max_image_size_mb: 30
+        ui_label: Фото для референса
+        ui_order: 2
+      aspect_ratio:
+        type: string
+        required: false
+        values:
+        - '1:1'
+        - '2:3'
+        - '3:2'
+        - '3:4'
+        - '4:3'
+        - '4:5'
+        - '5:4'
+        - '9:16'
+        - '16:9'
+        - '21:9'
+        - auto
+        default: '16:9'
+        ui_label: Соотношение сторон
+        ui_order: 3
+      resolution:
+        type: string
+        required: false
+        values:
+        - 2K
+        - 4K
+        variant: false
+        default: 2K
+        ui_label: Разрешение
+        ui_order: 4
+      output_format:
+        type: string
+        required: false
+        values:
+        - png
+        - jpg
+        default: png
+        ui_label: Формат файла
+        ui_order: 5
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: Seedream 5 Lite
+  sort_order: 30
+  status: Basic
+  model:
+    type: string
+    required: true
+    values:
+    - seedream/5-lite-text-to-image
+    ui_label: Text-to-Image
+    sort_order: 10
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 2995
+        ui_label: Запрос
+        ui_order: 1
+      aspect_ratio:
+        type: string
+        required: true
+        values:
+        - '1:1'
+        - '4:3'
+        - '3:4'
+        - '16:9'
+        - '9:16'
+        - '2:3'
+        - '3:2'
+        - '21:9'
+        default: '16:9'
+        ui_label: Соотношение сторон
+        ui_order: 2
+      quality:
+        type: string
+        required: true
+        values:
+        - basic
+        - high
+        default: basic
+        ui_label: Качество
+        ui_order: 3
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: Seedream 5 Lite
+  sort_order: 30
+  status: Basic
+  model:
+    type: string
+    required: true
+    values:
+    - seedream/5-lite-image-to-image
+    ui_label: Image-to-Image
+    sort_order: 20
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 2996
+        ui_label: Запрос
+        ui_order: 1
+      image_urls:
+        type: array
+        required: true
+        max_images: 1
+        max_image_size_mb: 10
+        ui_label: Фото для референса
+        ui_order: 2
+      aspect_ratio:
+        type: string
+        required: true
+        values:
+        - '1:1'
+        - '4:3'
+        - '3:4'
+        - '16:9'
+        - '9:16'
+        - '2:3'
+        - '3:2'
+        - '21:9'
+        default: '16:9'
+        ui_label: Соотношение сторон
+        ui_order: 3
+      quality:
+        type: string
+        required: true
+        values:
+        - basic
+        - high
+        default: basic
+        ui_label: Качество
+        ui_order: 4
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: Seedream 4.5
+  sort_order: 40
+  status: Basic
+  model:
+    type: string
+    required: true
+    values:
+    - seedream/4.5-text-to-image
+    ui_label: Text-to-Image
+    sort_order: 10
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 3000
+        ui_label: Запрос
+        ui_order: 1
+      aspect_ratio:
+        type: string
+        required: true
+        values:
+        - '1:1'
+        - '4:3'
+        - '3:4'
+        - '16:9'
+        - '9:16'
+        - '2:3'
+        - '3:2'
+        - '21:9'
+        default: '16:9'
+        ui_label: Соотношение сторон
+        ui_order: 2
+      quality:
+        type: string
+        required: true
+        values:
+        - basic
+        - high
+        default: basic
+        ui_label: Качество
+        ui_order: 3
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: Seedream 4.5
+  sort_order: 40
+  status: Basic
+  model:
+    type: string
+    required: true
+    values:
+    - seedream/4.5-edit
+    ui_label: Image-to-Image
+    sort_order: 20
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 3000
+        ui_label: Запрос
+        ui_order: 1
+      image_urls:
+        type: array
+        required: true
+        max_images: 1
+        max_image_size_mb: 10
+        ui_label: Фото для референса
+        ui_order: 2
+      aspect_ratio:
+        type: string
+        required: true
+        values:
+        - '1:1'
+        - '4:3'
+        - '3:4'
+        - '16:9'
+        - '9:16'
+        - '2:3'
+        - '3:2'
+        - '21:9'
+        default: '16:9'
+        ui_label: Соотношение сторон
+        ui_order: 3
+      quality:
+        type: string
+        required: true
+        values:
+        - basic
+        - high
+        default: basic
+        ui_label: Качество
+        ui_order: 4
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: GPT Image 1.5
+  sort_order: 50
+  status: "Basic*"
+  model:
+    type: string
+    required: true
+    values:
+    - gpt-image/1.5-text-to-image
+    ui_label: Text-to-Image
+    sort_order: 10
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 3000
+        ui_label: Запрос
+        ui_order: 1
+      aspect_ratio:
+        type: string
+        required: true
+        values:
+        - '1:1'
+        - '2:3'
+        - '3:2'
+        default: '3:2'
+        ui_label: Соотношение сторон
+        ui_order: 2
+      quality:
+        type: string
+        required: true
+        values:
+        - medium
+        - high
+        variant: true
+        default: medium
+        ui_label: Качество
+        ui_order: 3
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: GPT Image 1.5
+  sort_order: 50
+  status: "Basic*"
+  model:
+    type: string
+    required: true
+    values:
+    - gpt-image/1.5-image-to-image
+    ui_label: Image-to-Image
+    sort_order: 20
+  input:
+    type: object
+    required: true
+    parameters:
+      input_urls:
+        type: array
+        required: true
+        ui_label: Фото для референса
+        ui_order: 1
+      prompt:
+        type: string
+        required: true
+        max_length: 3000
+        max_images: 1
+        max_image_size_mb: 10
+        ui_label: Запрос
+        ui_order: 2
+      aspect_ratio:
+        type: string
+        required: true
+        values:
+        - '1:1'
+        - '2:3'
+        - '3:2'
+        default: '3:2'
+        ui_label: Соотношение сторон
+        ui_order: 3
+      quality:
+        type: string
+        required: true
+        values:
+        - medium
+        - high
+        variant: false
+        default: medium
+        ui_label: Качество
+        ui_order: 4
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: image
+- provider: Sora 2 Pro
+  sort_order: 60
+  status: Pro
+  model:
+    type: string
+    required: true
+    values:
+    - sora-2-pro-text-to-video
+    ui_label: Text-to-Video
+    sort_order: 10
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 10000
+        ui_label: Запрос
+        ui_order: 1
+      aspect_ratio:
+        type: string
+        required: false
+        values:
+        - portrait
+        - landscape
+        default: landscape
+        ui_label: Соотношение сторон
+        ui_order: 2
+      n_frames:
+        type: string
+        required: false
+        values:
+        - '10'
+        - '15'
+        variant: false
+        default: '10'
+        ui_label: Длительность
+        ui_order: 3
+      size:
+        type: string
+        required: false
+        values:
+        - standard
+        - high
+        variant: false
+        default: standart
+        ui_label: Качество
+        ui_order: 4
+      remove_watermark:
+        type: boolean
+        required: false
+        default: true
+        ui_label: Убрать watermark
+        ui_order: 5
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: video
+- provider: Sora 2 Pro
+  sort_order: 60
+  status: Pro
+  model:
+    type: string
+    required: true
+    values:
+    - sora-2-pro-image-to-video
+    ui_label: Image-to-Video
+    sort_order: 20
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 10000
+        ui_label: Запрос
+        ui_order: 1
+      image_urls:
+        type: array
+        required: true
+        max_images: 1
+        max_image_size_mb: 10
+        ui_label: Фото для референса
+        ui_order: 2
+      aspect_ratio:
+        type: string
+        required: false
+        values:
+        - portrait
+        - landscape
+        default: landscape
+        ui_label: Соотношение сторон
+        ui_order: 3
+      n_frames:
+        type: string
+        required: false
+        values:
+        - '10'
+        - '15'
+        variant: false
+        default: '10'
+        ui_label: Длительность
+        ui_order: 4
+      size:
+        type: string
+        required: false
+        values:
+        - standard
+        - high
+        variant: false
+        default: standart
+        ui_label: Качество
+        ui_order: 5
+      remove_watermark:
+        type: boolean
+        required: false
+        default: true
+        ui_label: Убрать watermark
+        ui_order: 6
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: video
+- provider: Kling 2.6
+  sort_order: 70
+  status: Pro
+  model:
+    type: string
+    required: true
+    values:
+    - kling-2.6/text-to-video
+    ui_label: Text-to-Video
+    sort_order: 10
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: 2500
+        ui_label: Запрос
+        ui_order: 1
+      sound:
+        type: boolean
+        required: true
+        variant: false
+        default: true
+        ui_label: Звук
+        ui_order: 2
+      aspect_ratio:
+        type: string
+        required: true
+        values:
+        - '1:1'
+        - '16:9'
+        - '9:16'
+        default: '16:9'
+        ui_label: Соотношение сторон
+        ui_order: 3
+      duration:
+        type: string
+        required: true
+        values:
+        - '5'
+        - '10'
+        variant: false
+        default: '10'
+        ui_label: Длительность
+        ui_order: 4
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: video
+- provider: Kling 2.6
+  sort_order: 70
+  status: Pro
+  model:
+    type: string
+    required: true
+    values:
+    - kling-2.6/image-to-video
+    ui_label: Image-to-Video
+    sort_order: 20
+  input:
+    type: object
+    required: true
+    parameters:
+      prompt:
+        type: string
+        required: true
+        max_length: true
+        ui_label: Запрос
+        ui_order: 1
+      image_urls:
+        type: array
+        required: true
+        max_images: 1
+        max_image_size_mb: 10
+        ui_label: Фото для референса
+        ui_order: 2
+      sound:
+        type: boolean
+        required: true
+        variant: false
+        default: true
+        ui_label: Звук
+        ui_order: 3
+      duration:
+        type: string
+        required: true
+        values:
+        - '5'
+        - '10'
+        variant: false
+        default: '10'
+        ui_label: Длительность
+        ui_order: 4
+  callBackUrl:
+    type: string
+    required: false
+  gen_type: video

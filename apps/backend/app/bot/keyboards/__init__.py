@@ -1,0 +1,51 @@
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+
+def main_menu_keyboard(tma_url: str) -> InlineKeyboardMarkup:
+    """Main menu inline keyboard."""
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text="\U0001f3a8 Генерация",
+                web_app=WebAppInfo(url=tma_url),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="\U0001f4cb История",
+                web_app=WebAppInfo(url=f"{tma_url}/history"),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="\U0001f4b0 Баланс",
+                callback_data="menu:balance",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="\U0001f6df Поддержка",
+                url="https://t.me/aipixl_bot_support",
+            )
+        ],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def balance_menu_keyboard(tma_url: str) -> InlineKeyboardMarkup:
+    """Balance submenu inline keyboard."""
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text="\U0001f4b3 Пополнить",
+                web_app=WebAppInfo(url=f"{tma_url}/packages"),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="\u25c0\ufe0f Назад",
+                callback_data="menu:back",
+            )
+        ],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)

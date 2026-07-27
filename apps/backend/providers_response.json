@@ -1,0 +1,675 @@
+{
+  "providers": [
+    {
+      "id": 6,
+      "title": "Nano Banana Pro",
+      "gen_type": "image",
+      "models": [
+        {
+          "id": 10,
+          "api_model_id": "nano-banana-pro",
+          "title": "Nano Banana Pro",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 20000,
+              "ui_label": "Запрос"
+            },
+            "image_input": {
+              "type": "array",
+              "required": false,
+              "max_images": 8,
+              "max_image_size_mb": 30,
+              "ui_label": "Фото для референса"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "1:1",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:3",
+                "4:5",
+                "5:4",
+                "9:16",
+                "16:9",
+                "21:9",
+                "auto"
+              ],
+              "default": "16:9",
+              "ui_label": "Соотношение сторон"
+            },
+            "resolution": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "2K",
+                "4K"
+              ],
+              "variant": true,
+              "default": "2K",
+              "ui_label": "Разрешение"
+            },
+            "output_format": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "png",
+                "jpg"
+              ],
+              "default": "png",
+              "ui_label": "Формат файла"
+            }
+          },
+          "variant_keys": [
+            "resolution"
+          ],
+          "pricing": [
+            {
+              "id": 25,
+              "variant_values": {
+                "resolution": "2K"
+              },
+              "price": 3
+            },
+            {
+              "id": 26,
+              "variant_values": {
+                "resolution": "4K"
+              },
+              "price": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Seedream 4.5",
+      "gen_type": "image",
+      "models": [
+        {
+          "id": 11,
+          "api_model_id": "seedream/4.5-text-to-image",
+          "title": "Text-to-Image",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 3000,
+              "ui_label": "Запрос"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "1:1",
+                "4:3",
+                "3:4",
+                "16:9",
+                "9:16",
+                "2:3",
+                "3:2",
+                "21:9"
+              ],
+              "default": "16:9",
+              "ui_label": "Соотношение сторон"
+            },
+            "quality": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "basic",
+                "high"
+              ],
+              "default": "basic",
+              "ui_label": "Качество"
+            }
+          },
+          "variant_keys": [],
+          "pricing": [
+            {
+              "id": 27,
+              "variant_values": {},
+              "price": 1
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "api_model_id": "seedream/4.5-edit",
+          "title": "Image-to-Image",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 3000,
+              "ui_label": "Запрос"
+            },
+            "image_urls": {
+              "type": "array",
+              "required": true,
+              "max_images": 1,
+              "max_image_size_mb": 10,
+              "ui_label": "Фото для референса"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "1:1",
+                "4:3",
+                "3:4",
+                "16:9",
+                "9:16",
+                "2:3",
+                "3:2",
+                "21:9"
+              ],
+              "default": "16:9",
+              "ui_label": "Соотношение сторон"
+            },
+            "quality": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "basic",
+                "high"
+              ],
+              "default": "basic",
+              "ui_label": "Качество"
+            }
+          },
+          "variant_keys": [],
+          "pricing": [
+            {
+              "id": 28,
+              "variant_values": {},
+              "price": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "GPT Image 1.5",
+      "gen_type": "image",
+      "models": [
+        {
+          "id": 13,
+          "api_model_id": "gpt-image/1.5-text-to-image",
+          "title": "Text-to-Image",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 3000,
+              "ui_label": "Запрос"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "1:1",
+                "2:3",
+                "3:2"
+              ],
+              "default": "3:2",
+              "ui_label": "Соотношение сторон"
+            },
+            "quality": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "medium",
+                "high"
+              ],
+              "variant": true,
+              "default": "medium",
+              "ui_label": "Качество"
+            }
+          },
+          "variant_keys": [
+            "quality"
+          ],
+          "pricing": [
+            {
+              "id": 29,
+              "variant_values": {
+                "quality": "medium"
+              },
+              "price": 1
+            },
+            {
+              "id": 30,
+              "variant_values": {
+                "quality": "high"
+              },
+              "price": 4
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "api_model_id": "gpt-image/1.5-image-to-image",
+          "title": "Image-to-Image",
+          "input_schema": {
+            "input_urls": {
+              "type": "array",
+              "required": true,
+              "ui_label": "Фото для референса"
+            },
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 3000,
+              "max_images": 1,
+              "max_image_size_mb": 10,
+              "ui_label": "Запрос"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "1:1",
+                "2:3",
+                "3:2"
+              ],
+              "default": "3:2",
+              "ui_label": "Соотношение сторон"
+            },
+            "quality": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "medium",
+                "high"
+              ],
+              "variant": true,
+              "default": "medium",
+              "ui_label": "Качество"
+            }
+          },
+          "variant_keys": [
+            "quality"
+          ],
+          "pricing": [
+            {
+              "id": 31,
+              "variant_values": {
+                "quality": "medium"
+              },
+              "price": 1
+            },
+            {
+              "id": 32,
+              "variant_values": {
+                "quality": "high"
+              },
+              "price": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Sora 2 Pro",
+      "gen_type": "video",
+      "models": [
+        {
+          "id": 15,
+          "api_model_id": "sora-2-pro-text-to-video",
+          "title": "Text-to-Video",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 10000,
+              "ui_label": "Запрос"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "portrait",
+                "landscape"
+              ],
+              "default": "landscape",
+              "ui_label": "Соотношение сторон"
+            },
+            "n_frames": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "10",
+                "15"
+              ],
+              "variant": true,
+              "default": "10",
+              "ui_label": "Длительность"
+            },
+            "size": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "standard",
+                "high"
+              ],
+              "variant": true,
+              "default": "standart",
+              "ui_label": "Качество"
+            },
+            "remove_watermark": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "ui_label": "Убрать watermark"
+            }
+          },
+          "variant_keys": [
+            "n_frames",
+            "size"
+          ],
+          "pricing": [
+            {
+              "id": 33,
+              "variant_values": {
+                "n_frames": "10",
+                "size": "standard"
+              },
+              "price": 25
+            },
+            {
+              "id": 34,
+              "variant_values": {
+                "n_frames": "10",
+                "size": "high"
+              },
+              "price": 55
+            },
+            {
+              "id": 35,
+              "variant_values": {
+                "n_frames": "15",
+                "size": "standard"
+              },
+              "price": 45
+            },
+            {
+              "id": 36,
+              "variant_values": {
+                "n_frames": "15",
+                "size": "high"
+              },
+              "price": 105
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "api_model_id": "sora-2-pro-image-to-video",
+          "title": "Image-to-Video",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 10000,
+              "ui_label": "Запрос"
+            },
+            "image_urls": {
+              "type": "array",
+              "required": true,
+              "max_images": 1,
+              "max_image_size_mb": 10,
+              "ui_label": "Фото для референса"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "portrait",
+                "landscape"
+              ],
+              "default": "landscape",
+              "ui_label": "Соотношение сторон"
+            },
+            "n_frames": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "10",
+                "15"
+              ],
+              "variant": true,
+              "default": "10",
+              "ui_label": "Длительность"
+            },
+            "size": {
+              "type": "string",
+              "required": false,
+              "values": [
+                "standard",
+                "high"
+              ],
+              "variant": true,
+              "default": "standart",
+              "ui_label": "Качество"
+            },
+            "remove_watermark": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "ui_label": "Убрать watermark"
+            }
+          },
+          "variant_keys": [
+            "n_frames",
+            "size"
+          ],
+          "pricing": [
+            {
+              "id": 37,
+              "variant_values": {
+                "n_frames": "10",
+                "size": "standard"
+              },
+              "price": 25
+            },
+            {
+              "id": 38,
+              "variant_values": {
+                "n_frames": "10",
+                "size": "high"
+              },
+              "price": 55
+            },
+            {
+              "id": 39,
+              "variant_values": {
+                "n_frames": "15",
+                "size": "standard"
+              },
+              "price": 45
+            },
+            {
+              "id": 40,
+              "variant_values": {
+                "n_frames": "15",
+                "size": "high"
+              },
+              "price": 105
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Kling 2.6",
+      "gen_type": "video",
+      "models": [
+        {
+          "id": 17,
+          "api_model_id": "kling-2.6/text-to-video",
+          "title": "Text-to-Video",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": 2500,
+              "ui_label": "Запрос"
+            },
+            "sound": {
+              "type": "boolean",
+              "required": true,
+              "variant": true,
+              "default": true,
+              "ui_label": "Звук"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "1:1",
+                "16:9",
+                "9:16"
+              ],
+              "default": "16:9",
+              "ui_label": "Соотношение сторон"
+            },
+            "duration": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "5",
+                "10"
+              ],
+              "variant": true,
+              "default": "10",
+              "ui_label": "Длительность"
+            }
+          },
+          "variant_keys": [
+            "sound",
+            "duration"
+          ],
+          "pricing": [
+            {
+              "id": 41,
+              "variant_values": {
+                "duration": "5",
+                "sound": false
+              },
+              "price": 9
+            },
+            {
+              "id": 42,
+              "variant_values": {
+                "duration": "5",
+                "sound": true
+              },
+              "price": 18
+            },
+            {
+              "id": 43,
+              "variant_values": {
+                "duration": "10",
+                "sound": false
+              },
+              "price": 18
+            },
+            {
+              "id": 44,
+              "variant_values": {
+                "duration": "10",
+                "sound": true
+              },
+              "price": 36
+            }
+          ]
+        },
+        {
+          "id": 18,
+          "api_model_id": "kling-2.6/image-to-video",
+          "title": "Image-to-Video",
+          "input_schema": {
+            "prompt": {
+              "type": "string",
+              "required": true,
+              "max_length": true,
+              "ui_label": "Запрос"
+            },
+            "image_urls": {
+              "type": "array",
+              "required": true,
+              "max_images": 1,
+              "max_image_size_mb": 10,
+              "ui_label": "Фото для референса"
+            },
+            "sound": {
+              "type": "boolean",
+              "required": true,
+              "variant": true,
+              "default": true,
+              "ui_label": "Звук"
+            },
+            "duration": {
+              "type": "string",
+              "required": true,
+              "values": [
+                "5",
+                "10"
+              ],
+              "variant": true,
+              "default": "10",
+              "ui_label": "Длительность"
+            }
+          },
+          "variant_keys": [
+            "sound",
+            "duration"
+          ],
+          "pricing": [
+            {
+              "id": 45,
+              "variant_values": {
+                "duration": "5",
+                "sound": false
+              },
+              "price": 9
+            },
+            {
+              "id": 46,
+              "variant_values": {
+                "duration": "5",
+                "sound": true
+              },
+              "price": 18
+            },
+            {
+              "id": 47,
+              "variant_values": {
+                "duration": "10",
+                "sound": false
+              },
+              "price": 18
+            },
+            {
+              "id": 48,
+              "variant_values": {
+                "duration": "10",
+                "sound": true
+              },
+              "price": 36
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

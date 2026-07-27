@@ -1,0 +1,140 @@
+- product: nano-banana-pro
+  variant_values: {}
+  price: 5
+  active: true
+- product: nano-banana-2
+  variant_values: {}
+  price: 5
+  active: true
+- product: seedream/5-lite-text-to-image
+  variant_values: {}
+  price: 2
+  active: true
+- product: seedream/5-lite-image-to-image
+  variant_values: {}
+  price: 2
+  active: true
+- product: seedream/4.5-text-to-image
+  variant_values: {}
+  price: 2
+  active: true
+- product: seedream/4.5-edit
+  variant_values: {}
+  price: 2
+  active: true
+- product: gpt-image/1.5-text-to-image
+  variant_values:
+    quality: medium
+  price: 2
+  active: true
+- product: gpt-image/1.5-text-to-image
+  variant_values:
+    quality: high
+  price: 5
+  active: true
+- product: gpt-image/1.5-image-to-image
+  variant_values:
+    quality: medium
+  price: 2
+  active: true
+- product: gpt-image/1.5-image-to-image
+  variant_values:
+    quality: high
+  price: 5
+  active: true
+- product: sora-2-pro-text-to-video
+  variant_values:
+    n_frames: '10'
+    size: standard
+  price: 25
+  active: false
+- product: sora-2-pro-text-to-video
+  variant_values:
+    n_frames: '10'
+    size: high
+  price: 55
+  active: false
+- product: sora-2-pro-text-to-video
+  variant_values:
+    n_frames: '15'
+    size: standard
+  price: 45
+  active: false
+- product: sora-2-pro-text-to-video
+  variant_values:
+    n_frames: '15'
+    size: high
+  price: 105
+  active: false
+- product: sora-2-pro-image-to-video
+  variant_values:
+    n_frames: '10'
+    size: standard
+  price: 25
+  active: false
+- product: sora-2-pro-image-to-video
+  variant_values:
+    n_frames: '10'
+    size: high
+  price: 55
+  active: false
+- product: sora-2-pro-image-to-video
+  variant_values:
+    n_frames: '15'
+    size: standard
+  price: 45
+  active: false
+- product: sora-2-pro-image-to-video
+  variant_values:
+    n_frames: '15'
+    size: high
+  price: 105
+  active: false
+- product: kling-2.6/text-to-video
+  variant_values:
+    duration: '5'
+    sound: false
+  price: 9
+  active: false
+- product: kling-2.6/text-to-video
+  variant_values:
+    duration: '5'
+    sound: true
+  price: 18
+  active: false
+- product: kling-2.6/text-to-video
+  variant_values:
+    duration: '10'
+    sound: false
+  price: 18
+  active: false
+- product: kling-2.6/text-to-video
+  variant_values:
+    duration: '10'
+    sound: true
+  price: 36
+  active: false
+- product: kling-2.6/image-to-video
+  variant_values:
+    duration: '5'
+    sound: false
+  price: 9
+  active: false
+- product: kling-2.6/image-to-video
+  variant_values:
+    duration: '5'
+    sound: true
+  price: 18
+  active: false
+- product: kling-2.6/image-to-video
+  variant_values:
+    duration: '10'
+    sound: false
+  price: 18
+  active: false
+- product: kling-2.6/image-to-video
+  variant_values:
+    duration: '10'
+    sound: true
+  price: 36
+  active: false

@@ -1,0 +1,122 @@
+"""Application entry point."""
+
+import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from api import create_app
+from bot import create_bot, create_dispatcher, setup_bot_webhook, shutdown_bot_webhook
+from core.config import settings
+from core.logging import setup_logging
+from db.session import create_tables
+from fastapi import FastAPI
+from loguru import logger
+from services.funnel import funnel_message_loop, seed_funnel_steps
+from services.payment import stale_payment_cleanup_loop
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """FastAPI lifespan: startup and shutdown events."""
+    setup_logging()
+    logger.info("Starting pixlbot API...")
+
+    await create_tables()
+    logger.info("Database initialized")
+
+    await seed_funnel_steps()
+    logger.info("Funnel steps seeded")
+
+    # Setup bot webhook or polling
+    if settings.webhook_enabled:
+        await setup_bot_webhook(app)
+        logger.info("Bot running in webhook mode")
+    else:
+        # Run polling as background task
+        bot = create_bot()
+        dp = create_dispatcher()
+        app.state.bot = bot
+        app.state.dispatcher = dp
+        app.state.polling_task = asyncio.create_task(dp.start_polling(bot))
+        logger.info("Bot running in polling mode")
+
+    # Start stale payment cleanup background task
+    app.state.stale_payment_task = asyncio.create_task(stale_payment_cleanup_loop())
+
+    # Start funnel message loop
+    app.state.funnel_task = asyncio.create_task(funnel_message_loop())
+
+    yield
+
+    # Stop stale payment cleanup
+    stale_task = getattr(app.state, "stale_payment_task", None)
+    if stale_task:
+        stale_task.cancel()
+        try:
+            await stale_task
+        except asyncio.CancelledError:
+            pass
+
+    # Stop funnel message loop
+    funnel_task = getattr(app.state, "funnel_task", None)
+    if funnel_task:
+        funnel_task.cancel()
+        try:
+            await funnel_task
+        except asyncio.CancelledError:
+            pass
+
+    # Cleanup bot
+    if settings.webhook_enabled:
+        await shutdown_bot_webhook(app)
+    else:
+        # Stop polling
+        polling_task = getattr(app.state, "polling_task", None)
+        if polling_task:
+            polling_task.cancel()
+            try:
+                await polling_task
+            except asyncio.CancelledError:
+                pass
+        bot = getattr(app.state, "bot", None)
+        if bot:
+            await bot.session.close()
+        logger.info("Polling stopped")
+
+    logger.info("pixlbot API stopped")
+
+
+def create_application() -> FastAPI:
+    """Create main FastAPI application with lifespan."""
+    fastapi_app = create_app()
+    fastapi_app.router.lifespan_context = lifespan
+    return fastapi_app
+
+
+# FastAPI app instance for uvicorn
+app = create_application()
+
+
+async def run_bot() -> None:
+    """Run Telegram bot polling (standalone mode)."""
+    setup_logging()
+    logger.info("Starting pixlbot bot...")
+
+    await create_tables()
+    logger.info("Database initialized")
+
+    bot = create_bot()
+    dp = create_dispatcher()
+
+    logger.info("Bot is starting polling...")
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
+        logger.info("pixlbot bot stopped")
+
+
+if __name__ == "__main__":
+    # For development: run bot only
+    # Production: uvicorn main:app + separate bot process
+    asyncio.run(run_bot())

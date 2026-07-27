@@ -1,0 +1,14 @@
+- name: Start
+  description: "Стоимость 1 генерации Pro = 29,5руб.(-20%)\nПакет включает: 20 Pro генераций или 50 Basic генераций"
+  credit_amount: 100
+  fiat_price: 59000  # 590 руб в копейках
+
+- name: Pro
+  description: "Стоимость 1 генерации Pro = 26,5руб.(-10%)\nПакет включает: 60 Pro генераций или 150 Basic генераций"
+  credit_amount: 300
+  fiat_price: 159000  # 1590 руб в копейках
+
+- name: Premier
+  description: "Стоимость 1 генерации Pro = 23,5руб.(-20%)\nПакет включает: 200 Pro генераций или 500 Basic генераций"
+  credit_amount: 1000
+  fiat_price: 470000  # 4700 руб в копейках

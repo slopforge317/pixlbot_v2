@@ -1,0 +1,50 @@
+funnel_steps:
+  - name: "new_user_no_generation"
+    trigger_event: "user_registered"
+    delay_seconds: 420  # 10 минут
+    condition: "no_generation_done"
+    message_text: |
+      Привет! 👋
+
+      Ты ещё не попробовал генерацию — а у тебя уже есть 1 бесплатная Pro генерация и 2 Basic!
+
+      Открой приложение и создай своё первое изображение прямо сейчас 🎨
+    button_text: "Открыть приложение"
+    button_url: "{tma_url}"
+    is_active: true
+
+  - name: "post_first_gen_5min"
+    trigger_event: "first_generation_done"
+    delay_seconds: 120  # 5 минут
+    condition: null
+    message_text: |
+      Твоя первая генерация готова! 🎉
+
+      Хочешь создавать больше? Пополни баланс и продолжай экспериментировать. Cтоимость генерации от 9.4 руб.
+    button_text: "Пополнить баланс"
+    button_url: "{tma_url}/packages"
+    is_active: true
+
+  - name: "post_first_gen_1hr"
+    trigger_event: "first_generation_done"
+    delay_seconds: 3600  # 1 час
+    condition: "no_deposit"
+    message_text: |
+      Как тебе PixlBot? 😊
+
+      Напоминаем — у нас лучшие AI-модели по выгодным ценам в рублях: , стоимость генерации от 9.4 руб..
+    button_text: "Купить кредиты"
+    button_url: "{tma_url}/packages"
+    is_active: true
+
+  - name: "post_first_gen_24hr"
+    trigger_event: "first_generation_done"
+    delay_seconds: 86400  # 24 часа
+    condition: "no_deposit"
+    message_text: |
+      Всё ещё думаешь? 🤔
+
+      Воспользуйся нашими пакетами кредитов — оплата в рублях, стоимость генерации от 9.4 руб.
+    button_text: "Выбрать пакет"
+    button_url: "{tma_url}/packages"
+    is_active: true
