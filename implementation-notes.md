@@ -115,3 +115,13 @@
 - Compose обнаруживает старый orphan container `pixlbot-test-tma` из исходного
   проекта. Он намеренно не удалён, поскольку новый монорепозиторий не должен
   изменять или очищать старое окружение без отдельного решения.
+
+## Проверка Docker-образов
+
+- Production-образы backend и нового TMA успешно собираются через
+  `docker compose --env-file .env.example -f compose.yaml -f compose.prod.yaml build backend tma`.
+- Для нового TMA добавлен `.dockerignore`: локальные `node_modules`, pnpm store,
+  `dist` и env-файлы больше не попадают в Docker build context.
+- Полный живой запуск Telegram-приложения не выполнялся, потому что для него нужен
+  настоящий `BOT_TOKEN`. Сборка образов, миграции, seed и автоматические тесты
+  проверены независимо от production-секретов.
