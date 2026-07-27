@@ -1,0 +1,178 @@
+pg_users:
+  query: |
+    SELECT
+      count(*) AS total,
+      count(*) FILTER (WHERE created_at > now() - interval '24 hours') AS new_24h,
+      (SELECT count(DISTINCT user_id) FROM generations_job WHERE created_at > now() - interval '7 days') AS active_7d
+    FROM users
+  metrics:
+    - total:
+        usage: "GAUGE"
+        description: "Total number of users"
+    - new_24h:
+        usage: "GAUGE"
+        description: "New users in last 24 hours"
+    - active_7d:
+        usage: "GAUGE"
+        description: "Active users in last 7 days"
+
+pg_payments_by_status:
+  query: |
+    SELECT
+      status,
+      count(*) AS count
+    FROM payments
+    GROUP BY status
+  metrics:
+    - status:
+        usage: "LABEL"
+        description: "Payment status"
+    - count:
+        usage: "GAUGE"
+        description: "Number of payments by status"
+
+pg_revenue:
+  query: |
+    SELECT
+      coalesce(sum(amount_currency) FILTER (WHERE created_at > now() - interval '24 hours'), 0) AS revenue_24h_kopecks,
+      coalesce(sum(amount_currency) FILTER (WHERE created_at > now() - interval '30 days'), 0) AS revenue_30d_kopecks
+    FROM payments
+    WHERE status = 'success'
+  metrics:
+    - revenue_24h_kopecks:
+        usage: "GAUGE"
+        description: "Revenue in last 24 hours (kopecks)"
+    - revenue_30d_kopecks:
+        usage: "GAUGE"
+        description: "Revenue in last 30 days (kopecks)"
+
+pg_generations_by_status:
+  query: |
+    SELECT
+      status,
+      count(*) AS count
+    FROM generations_job
+    GROUP BY status
+  metrics:
+    - status:
+        usage: "LABEL"
+        description: "Job status"
+    - count:
+        usage: "GAUGE"
+        description: "Number of generation jobs by status"
+
+pg_generations_by_model:
+  query: |
+    SELECT
+      coalesce(m.title, 'unknown') AS model,
+      count(*) AS count
+    FROM generations_job g
+    LEFT JOIN pricing_variants pv ON g.pricing_variant_id = pv.id
+    LEFT JOIN ai_models m ON pv.model_id = m.id
+    WHERE g.created_at > now() - interval '24 hours'
+    GROUP BY m.title
+  metrics:
+    - model:
+        usage: "LABEL"
+        description: "AI model name"
+    - count:
+        usage: "GAUGE"
+        description: "Generations by model in last 24 hours"
+
+pg_generations_error_rate:
+  query: |
+    SELECT
+      count(*) FILTER (WHERE status = 'error') AS errors,
+      count(*) AS total,
+      CASE WHEN count(*) > 0
+        THEN round(count(*) FILTER (WHERE status = 'error')::numeric / count(*)::numeric * 100, 2)
+        ELSE 0
+      END AS error_rate_pct
+    FROM generations_job
+    WHERE created_at > now() - interval '24 hours'
+  metrics:
+    - errors:
+        usage: "GAUGE"
+        description: "Generation errors in last 24 hours"
+    - total:
+        usage: "GAUGE"
+        description: "Total generations in last 24 hours"
+    - error_rate_pct:
+        usage: "GAUGE"
+        description: "Generation error rate percentage (24h)"
+
+pg_queue:
+  query: |
+    SELECT
+      count(*) FILTER (WHERE status = 'queue') AS queued,
+      count(*) FILTER (WHERE status = 'processing') AS processing
+    FROM generations_job
+  metrics:
+    - queued:
+        usage: "GAUGE"
+        description: "Jobs currently in queue"
+    - processing:
+        usage: "GAUGE"
+        description: "Jobs currently processing"
+
+pg_transactions_by_type:
+  query: |
+    SELECT
+      type,
+      count(*) AS count,
+      coalesce(sum(amount_credits), 0) AS total_credits
+    FROM transactions
+    WHERE created_at > now() - interval '24 hours'
+    GROUP BY type
+  metrics:
+    - type:
+        usage: "LABEL"
+        description: "Transaction type"
+    - count:
+        usage: "GAUGE"
+        description: "Number of transactions by type (24h)"
+    - total_credits:
+        usage: "GAUGE"
+        description: "Total credits by transaction type (24h)"
+
+pg_credits_spent_24h:
+  query: |
+    SELECT
+      coalesce(abs(sum(amount_credits) FILTER (WHERE type = 'withdrawal')), 0) AS credits_spent
+    FROM transactions
+    WHERE created_at > now() - interval '24 hours'
+  metrics:
+    - credits_spent:
+        usage: "GAUGE"
+        description: "Credits spent in last 24 hours"
+
+pg_sales_by_package:
+  query: |
+    SELECT
+      coalesce(cp.name, 'unknown') AS package_name,
+      cp.credit_amount AS package_credits,
+      cp.fiat_price AS package_price_kopecks,
+      count(p.payment_id) AS sales_count,
+      coalesce(sum(p.amount_currency), 0) AS total_revenue_kopecks
+    FROM payments p
+    JOIN credit_packages cp ON p.credit_package_id = cp.id
+    WHERE p.status = 'success'
+      AND p.created_at > now() - interval '30 days'
+    GROUP BY cp.name, cp.credit_amount, cp.fiat_price
+    ORDER BY sales_count DESC
+  metrics:
+    - package_name:
+        usage: "LABEL"
+        description: "Credit package name"
+    - package_credits:
+        usage: "LABEL"
+        description: "Credits in package"
+    - package_price_kopecks:
+        usage: "LABEL"
+        description: "Package price in kopecks"
+    - sales_count:
+        usage: "GAUGE"
+        description: "Number of sales per package (30d)"
+    - total_revenue_kopecks:
+        usage: "GAUGE"
+        description: "Revenue per package in kopecks (30d)"
