@@ -1,0 +1,57 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+!**/.env.example
+!**/.env.*.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Node.js
+node_modules/
+.pnpm-store/
+.vite/
+.cache/
+*.tsbuildinfo
+coverage/
+
+# Application state
+data/
+**/data/
+logs/
+**/logs/
+*.db
+*.sqlite
+*.sqlite3
+
+# Local tooling and editors
+.idea/
+.vscode/
+.cursor/
+.shared/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+.tmp/
+tmp/
+*.log
+npm-debug.log*
+pnpm-debug.log*
