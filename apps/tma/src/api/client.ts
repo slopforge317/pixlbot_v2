@@ -8,7 +8,6 @@
 // =============================================================================
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
-const MOCK_INIT_DATA = import.meta.env.VITE_MOCK_INIT_DATA || "";
 
 // =============================================================================
 // Auth Helper
@@ -16,7 +15,7 @@ const MOCK_INIT_DATA = import.meta.env.VITE_MOCK_INIT_DATA || "";
 
 /**
  * Get Telegram initData for API authorization.
- * Uses real initData from WebApp or mock data in development.
+ * Uses initData provided by Telegram WebApp.
  */
 function getInitData(): string {
   // Try to get real initData from Telegram WebApp
@@ -25,11 +24,6 @@ function getInitData(): string {
     window.Telegram?.WebApp?.initData
   ) {
     return window.Telegram.WebApp.initData;
-  }
-
-  // Fallback to mock data in development
-  if (MOCK_INIT_DATA) {
-    return MOCK_INIT_DATA;
   }
 
   return "";

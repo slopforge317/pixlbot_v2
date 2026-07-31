@@ -20,11 +20,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging()
     logger.info("Starting pixlbot API...")
 
-    await seed_funnel_steps()
-    logger.info("Funnel steps seeded")
+    if settings.funnel_enabled:
+        await seed_funnel_steps()
+        logger.info("Funnel steps seeded")
+    else:
+        logger.warning("Funnel messaging is disabled")
 
     # Setup bot webhook or polling
-    if settings.webhook_enabled:
+    if not settings.telegram_bot_enabled:
+        logger.warning("Telegram bot runtime is disabled")
+    elif settings.webhook_enabled:
         await setup_bot_webhook(app)
         logger.info("Bot running in webhook mode")
     else:
@@ -37,10 +42,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Bot running in polling mode")
 
     # Start stale payment cleanup background task
-    app.state.stale_payment_task = asyncio.create_task(stale_payment_cleanup_loop())
+    if settings.payment_cleanup_enabled:
+        app.state.stale_payment_task = asyncio.create_task(stale_payment_cleanup_loop())
+    else:
+        logger.warning("Stale payment cleanup is disabled")
 
-    # Start funnel message loop
-    app.state.funnel_task = asyncio.create_task(funnel_message_loop())
+    # Funnel messages require an active Telegram bot.
+    if settings.telegram_bot_enabled and settings.funnel_enabled:
+        app.state.funnel_task = asyncio.create_task(funnel_message_loop())
 
     yield
 
@@ -63,7 +72,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             pass
 
     # Cleanup bot
-    if settings.webhook_enabled:
+    if not settings.telegram_bot_enabled:
+        pass
+    elif settings.webhook_enabled:
         await shutdown_bot_webhook(app)
     else:
         # Stop polling

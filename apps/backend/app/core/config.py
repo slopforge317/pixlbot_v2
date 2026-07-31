@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     # Telegram
     bot_token: str = ""
+    telegram_bot_enabled: bool = True
     telegram_test_mode: bool = False  # Use Telegram Test Environment API
 
     # Database
@@ -67,10 +68,12 @@ class Settings(BaseSettings):
     yookassa_vat_code: int = 1  # 1=без НДС
 
     # Stale payment cleanup
+    payment_cleanup_enabled: bool = True
     stale_payment_check_interval_seconds: int = 300  # 5 min
     stale_payment_threshold_minutes: int = 15  # Pending older than this → stale
 
     # Funnel messaging
+    funnel_enabled: bool = True
     funnel_check_interval_seconds: int = 30
 
 

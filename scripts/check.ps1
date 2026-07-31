@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$env:BLACK_CACHE_DIR = Join-Path $projectRoot ".tmp/black-cache"
 
 function Invoke-CheckedStep {
     param(
@@ -41,26 +42,14 @@ Invoke-CheckedStep "TMA type checking" {
 Invoke-CheckedStep "TMA production build" {
     pnpm --dir (Join-Path $projectRoot "apps/tma") run build
 }
-Invoke-CheckedStep "Legacy TMA production build" {
-    npm --prefix (Join-Path $projectRoot "apps/tma-legacy") run build
-}
 
-$envFile = Join-Path $projectRoot ".env"
+$envFile = Join-Path $projectRoot ".env.test"
 if (-not (Test-Path -LiteralPath $envFile)) {
-    $envFile = Join-Path $projectRoot ".env.example"
+    $envFile = Join-Path $projectRoot ".env.test.example"
 }
 
-Invoke-CheckedStep "Development Compose configuration" {
-    docker compose --env-file $envFile -f (Join-Path $projectRoot "compose.yaml") -f (Join-Path $projectRoot "compose.dev.yaml") config --quiet
-}
 Invoke-CheckedStep "Test Compose configuration" {
-    docker compose --env-file $envFile -f (Join-Path $projectRoot "compose.yaml") -f (Join-Path $projectRoot "compose.test.yaml") config --quiet
-}
-Invoke-CheckedStep "Production Compose configuration" {
-    docker compose --env-file $envFile -f (Join-Path $projectRoot "compose.yaml") -f (Join-Path $projectRoot "compose.prod.yaml") config --quiet
-}
-Invoke-CheckedStep "Monitoring Compose configuration" {
-    docker compose --env-file $envFile -f (Join-Path $projectRoot "compose.yaml") -f (Join-Path $projectRoot "compose.monitoring.yaml") --profile monitoring config --quiet
+    docker compose --env-file $envFile -f (Join-Path $projectRoot "compose.test.yaml") config --quiet
 }
 
 Write-Output "All non-database checks passed."

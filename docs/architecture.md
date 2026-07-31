@@ -1,37 +1,46 @@
 # Архитектура
 
-## Компоненты
+## Test-стенд
 
 ```text
-Telegram Mini App
-       |
-       v
-Nginx / Vite dev proxy
-       |
-       v
-FastAPI API ---- PostgreSQL
-       |
-       +---- Telegram Bot API
-       +---- KIE API
-       +---- S3-compatible storage
-       +---- YooKassa
+Telegram client / Browser
+          |
+          | HTTPS
+          v
+   Caddy + TMA SPA
+          |
+          | /api, /health, /webhook
+          v
+      FastAPI API ---- PostgreSQL
+          |
+          +---- Telegram Bot API (polling)
+          +---- KIE API (следующий этап)
+          +---- S3 storage (следующий этап)
+          +---- YooKassa (следующий этап)
 ```
 
-- `apps/backend` содержит HTTP API, Telegram bot и текущие фоновые циклы.
-- `apps/tma` является целевым пользовательским интерфейсом.
-- `apps/tma-legacy` хранится только для переноса существующих сценариев.
-- `infra/monitoring` подключается через `compose.monitoring.yaml`. Grafana Alloy
-  собирает Docker logs и отправляет их в Loki; Prometheus получает системные и
-  PostgreSQL metrics.
+- `apps/tma` собирается в Docker image, где Caddy обслуживает статические файлы,
+  выполняет SPA fallback, проксирует backend и управляет TLS.
+- `apps/backend` содержит HTTP API и Telegram bot. Funnel и payment cleanup
+  workers на первом test-стенде отключены переменными окружения.
+- PostgreSQL доступен только внутри Compose network и через loopback host port.
+- Caddy хранит ACME state и сертификаты в persistent named volumes.
+- BotFather-бот использует обычный Telegram API и polling.
+
+## База данных
+
+- Новая чистая БД создаётся initial migration `20260727_0001`.
+- Legacy-БД содержит revision `f7d735a7befd` и не может автоматически пройти
+  новый migration graph.
+- Legacy schema принимается новой baseline только после автоматического сравнения
+  фактической схемы с SQLAlchemy metadata.
+- Runtime и seed не создают таблицы через `create_all`; production/test schema
+  управляется Alembic.
 
 ## Текущие ограничения
 
-- Генерации запускаются через FastAPI `BackgroundTasks` и пока не являются
-  устойчивой очередью.
-- Telegram polling и периодические задачи работают в процессе API, поэтому
-  backend нельзя безопасно масштабировать несколькими экземплярами.
-- Grafana PostgreSQL datasource пока использует application database user.
-  Перед production нужен отдельный read-only пользователь.
-
-Эти ограничения не блокируют локальную разработку, но должны быть устранены до
-горизонтального масштабирования production.
+- Generations используют FastAPI `BackgroundTasks`, а не устойчивую очередь.
+- Telegram polling и периодические задачи находятся в процессе API, поэтому
+  backend пока запускается в одном экземпляре.
+- KIE callback, S3 uploads и payments не проверяются на первом deployment этапе.
+- Monitoring не входит в первый запуск test-стенда.

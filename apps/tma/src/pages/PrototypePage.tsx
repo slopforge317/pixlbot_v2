@@ -59,7 +59,7 @@ function formatModelPrice(price: number | null) {
 
 function getModelsErrorMessage(error: unknown) {
   if (error instanceof Error && error.name === "UnauthorizedError") {
-    return "Нет Telegram initData. Откройте Mini App внутри Telegram или заполните VITE_MOCK_INIT_DATA."
+    return "Нет Telegram initData. Откройте Mini App внутри Telegram."
   }
 
   if (error instanceof Error) {

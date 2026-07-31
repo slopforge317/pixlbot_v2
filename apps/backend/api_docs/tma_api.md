@@ -42,24 +42,9 @@ Authorization: tma <initData>
 window.Telegram.WebApp.initData
 ```
 
-Для локальной разработки без Telegram можно сгенерировать валидный mock initData:
-
-```powershell
-cd C:\Users\dev\projects\bot\tma-backend
-$env:PYTHONPATH="app"
-poetry run python scripts/generate_init_data.py
-```
-
-Скрипт использует `BOT_TOKEN` из `.env`, поэтому token в backend env должен совпадать с token, которым backend валидирует initData.
-
-Пример frontend env:
-
-```env
-VITE_API_URL=http://localhost:8000/api
-VITE_MOCK_INIT_DATA=<output from scripts/generate_init_data.py>
-```
-
-Если header отсутствует или initData невалидный, backend вернет `401`.
+Frontend получает `initData` только из `Telegram.WebApp.initData`. Для серверного
+test-стенда Mini App необходимо открывать из меню тестового бота. Если header
+отсутствует или `initData` невалидный, backend вернет `401`.
 
 ## Common Headers
 
@@ -718,7 +703,7 @@ await fetch(upload_url, {
 
 ### App bootstrap
 
-1. Get `initData` from Telegram or `VITE_MOCK_INIT_DATA`.
+1. Get `initData` from `Telegram.WebApp.initData`.
 2. Call `GET /api/me`.
 3. Call `GET /api/providers`.
 4. Call `GET /api/packages` when payment screen opens.
@@ -741,4 +726,3 @@ await fetch(upload_url, {
 3. Call `POST /api/payments`.
 4. Open `confirmation_url`.
 5. Check `GET /api/payments/{payment_id}/status` after return or by polling.
-

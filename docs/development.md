@@ -1,58 +1,47 @@
-# Локальная разработка
+# Разработка и проверки
 
 ## Требования
 
-- Docker Desktop с Docker Compose.
-- Python 3.12 и Poetry 2.
+- Docker с Docker Compose.
+- Python 3.12 или 3.13 и Poetry 2.
 - Node.js 24.18 и pnpm 11.
 
-## Первичная настройка
+## Установка локальных зависимостей
 
 ```powershell
 .\scripts\setup.ps1
 ```
 
-После создания `.env` замените значения `BOT_TOKEN`, `POSTGRES_PASSWORD`,
-`WEBHOOK_SECRET` и `KIE_CALLBACK_SECRET`.
+Скрипт создаёт `.env.test` из `.env.test.example`, если файла ещё нет, и
+устанавливает зависимости backend и нового TMA. Реальные секреты не нужны для
+статических проверок.
 
-## Запуск
+## Статические проверки
 
 ```powershell
-.\scripts\dev.ps1
+.\scripts\check.ps1
 ```
 
-- TMA: `http://localhost:5173`
-- Backend: `http://localhost:8000`
-- Health check: `http://localhost:8000/health`
+Проверяются Poetry, Black, isort, flake8, pyright, TypeScript, production build
+нового TMA и итоговая `compose.test.yaml` конфигурация.
+
+## Backend tests
+
+```powershell
+.\scripts\test.ps1
+```
+
+Скрипт поднимает отдельный Compose project `pixlbot-pytest`, публикует PostgreSQL
+только на `127.0.0.1:5433`, создаёт базу `pixlbot_pytest` и запускает pytest.
+Серверная `.env.test` и серверный PostgreSQL volume при этом не используются.
 
 ## Seed
+
+Seed обновляет providers, models, pricing variants и packages. На восстановленной
+legacy-БД запускайте его только после schema validation и adoption:
 
 ```powershell
 .\scripts\seed.ps1
 ```
 
-## Monitoring
-
-```powershell
-docker compose `
-  --env-file .env `
-  -f compose.yaml `
-  -f compose.dev.yaml `
-  -f compose.monitoring.yaml `
-  --profile monitoring `
-  up -d
-```
-
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Loki: `http://localhost:3100`
-
-## Проверки
-
-```powershell
-.\scripts\check.ps1
-.\scripts\test.ps1
-```
-
-`check.ps1` выполняет статические проверки, frontend build и проверку Compose.
-`test.ps1` поднимает отдельный PostgreSQL на порту 5433 и запускает backend tests.
+Серверный порядок действий описан в `docs/deployment.md`.

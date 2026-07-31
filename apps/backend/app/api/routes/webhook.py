@@ -129,7 +129,7 @@ async def yookassa_webhook(request: Request) -> dict[str, bool]:
     Verifies the request comes from YooKassa IP ranges,
     then processes the payment notification asynchronously.
     """
-    # Get client IP (prefer X-Real-IP from nginx, fallback to X-Forwarded-For)
+    # Prefer the client IP supplied by the trusted reverse proxy.
     client_ip = request.headers.get("X-Real-IP")
     if not client_ip:
         forwarded = request.headers.get("X-Forwarded-For")
