@@ -47,3 +47,4 @@
   недоступны, потому что Docker daemon на рабочей машине не запущен.
 - Git remote `origin` привязан к `https://github.com/slopforge317/pixlbot_v2.git`;
   удалённый репозиторий не содержит веток и готов к первичной публикации.
+- Baseline опубликован в `origin/main`; первичный implementation commit — `56a5125`.
