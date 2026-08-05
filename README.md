@@ -36,4 +36,4 @@ docker compose --env-file .env.test -f compose.test.yaml up -d --build
 - [Архитектура](docs/architecture.md)
 - [Разработка и проверки](docs/development.md)
 - [Развёртывание test-стенда](docs/deployment.md)
-- [Принятие legacy-БД](docs/database-migration.md)
+- [Миграции legacy-БД](docs/database-migration.md)

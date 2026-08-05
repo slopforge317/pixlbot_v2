@@ -90,14 +90,14 @@ services:
       - tools
     restart: "no"
 
-  db-legacy:
+  db-tools:
     build:
       context: ./apps/backend
     environment:
       <<: *backend-environment
     entrypoint:
       - python
-      - scripts/adopt_legacy_schema.py
+      - scripts/database_tools.py
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,6 +150,10 @@ services:
 
 volumes:
   postgres_test_data:
+    name: ${POSTGRES_VOLUME_NAME:-pixlbot_v2_postgres_data}
   backend_test_logs:
+    name: pixlbot_v2_backend_logs
   caddy_test_data:
+    name: pixlbot_v2_caddy_data
   caddy_test_config:
+    name: pixlbot_v2_caddy_config

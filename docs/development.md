@@ -38,7 +38,7 @@
 ## Seed
 
 Seed обновляет providers, models, pricing variants и packages. На восстановленной
-legacy-БД запускайте его только после schema validation и adoption:
+legacy-БД запускайте его только после migrations, `alembic check` и summary:
 
 ```powershell
 .\scripts\seed.ps1

@@ -1,23 +1,50 @@
-"""Create the initial pixlbot schema.
+"""Create the squashed legacy pixlbot schema.
 
-Revision ID: 20260727_0001
+Revision ID: f7d735a7befd
 Revises:
-Create Date: 2026-07-27
+Create Date: 2026-08-05
 """
 
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision: str = "20260727_0001"
+revision: str = "f7d735a7befd"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+funnel_trigger_event = postgresql.ENUM(
+    "user_registered",
+    "first_generation_done",
+    name="funneltriggerevent",
+    create_type=False,
+)
+funnel_condition = postgresql.ENUM(
+    "no_generation_done",
+    "no_deposit",
+    name="funnelcondition",
+    create_type=False,
+)
+scheduled_message_status = postgresql.ENUM(
+    "pending",
+    "sent",
+    "skipped",
+    "cancelled",
+    name="scheduledmessagestatus",
+    create_type=False,
+)
+
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    funnel_trigger_event.create(bind, checkfirst=False)
+    funnel_condition.create(bind, checkfirst=False)
+    scheduled_message_status.create(bind, checkfirst=False)
+
     op.create_table(
         "credit_packages",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
@@ -34,23 +61,13 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=100), nullable=False),
         sa.Column(
             "trigger_event",
-            sa.Enum(
-                "user_registered",
-                "first_generation_done",
-                name="funneltriggerevent",
-                native_enum=False,
-            ),
+            funnel_trigger_event,
             nullable=False,
         ),
         sa.Column("delay_seconds", sa.Integer(), nullable=False),
         sa.Column(
             "condition",
-            sa.Enum(
-                "no_generation_done",
-                "no_deposit",
-                name="funnelcondition",
-                native_enum=False,
-            ),
+            funnel_condition,
             nullable=True,
         ),
         sa.Column("message_text", sa.Text(), nullable=False),
@@ -165,14 +182,7 @@ def upgrade() -> None:
         sa.Column("scheduled_at", sa.DateTime(), nullable=False),
         sa.Column(
             "status",
-            sa.Enum(
-                "pending",
-                "sent",
-                "skipped",
-                "cancelled",
-                name="scheduledmessagestatus",
-                native_enum=False,
-            ),
+            scheduled_message_status,
             nullable=False,
         ),
         sa.Column("sent_at", sa.DateTime(), nullable=True),
@@ -338,3 +348,7 @@ def downgrade() -> None:
     op.drop_table("providers")
     op.drop_table("funnel_steps")
     op.drop_table("credit_packages")
+    bind = op.get_bind()
+    scheduled_message_status.drop(bind, checkfirst=False)
+    funnel_condition.drop(bind, checkfirst=False)
+    funnel_trigger_event.drop(bind, checkfirst=False)

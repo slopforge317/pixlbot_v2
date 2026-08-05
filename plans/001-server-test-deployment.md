@@ -7,7 +7,7 @@
 - новым Telegram Mini App;
 - новым обычным BotFather-ботом в polling mode;
 - восстановленной копией legacy PostgreSQL;
-- проверенной и принятой новой Alembic baseline;
+- обычной Alembic-цепочкой от legacy baseline;
 - автоматическим HTTPS через Caddy;
 - публикацией исходников в `slopforge317/pixlbot_v2`.
 
@@ -23,15 +23,15 @@
    `TELEGRAM_TEST_MODE=false`.
 6. Bot API работает через polling; webhook будет добавлен позже.
 7. Legacy volume не подключается. База восстанавливается из проверенного custom dump.
-8. Новая initial migration применяется к чистой БД. Восстановленная legacy-БД
-   принимается только после сравнения фактической схемы с ORM metadata.
+8. Squashed baseline имеет revision `f7d735a7befd` из dump. Следующая обычная
+   migration нормализует legacy enum; ручной adoption не используется.
 9. Секреты хранятся только в серверном `.env.test` и не коммитятся.
 
 ## Этапы
 
 1. Нормализовать Compose, env templates и команды.
 2. Перевести TMA runtime с Nginx на Caddy.
-3. Добавить инструменты проверки и принятия legacy schema.
+3. Добавить legacy baseline, bridge migration и безопасные DB tools.
 4. Обновить deployment/database документацию.
 5. Проверить `.gitignore` и выполнить secret scan.
 6. Запустить статические проверки, тесты, frontend build и Compose validation.
@@ -45,9 +45,8 @@
 3. Создать `.env.test` из `.env.test.example` и заполнить секреты.
 4. Запустить только PostgreSQL.
 5. Восстановить legacy dump в новый volume.
-6. Проверить legacy revision и schema diff.
-7. Согласовать три известных legacy enum, повторить check и принять baseline
-   только при пустом schema diff; при любых других отличиях остановиться.
+6. Проверить legacy revision `f7d735a7befd`.
+7. Выполнить обычный `alembic upgrade head`, затем `alembic check`.
 8. Обезвредить pending фоновые сообщения в копии БД.
 9. Запустить seed вручную и проверить данные.
 10. Запустить весь Compose и проверить Caddy certificate, health, bot и TMA.

@@ -2,8 +2,8 @@
 
 Test-домен: `tma.pixlbot.ru`.
 
-Эта инструкция предполагает, что DNS указывает на сервер, порты 80/443 свободны,
-а проверенный legacy dump уже скопирован в безопасное место.
+Инструкция предполагает, что DNS уже указывает на сервер, TCP 80/443 свободны,
+а проверенный legacy dump находится вне каталога репозитория.
 
 ## 1. Получить проект
 
@@ -21,12 +21,13 @@ chmod 600 .env.test
 nano .env.test
 ```
 
-Обязательно замените `BOT_TOKEN`, `POSTGRES_PASSWORD`, `WEBHOOK_SECRET` и
-`KIE_CALLBACK_SECRET`. Для обычного тестового BotFather-бота оставьте:
+Замените `BOT_TOKEN`, `POSTGRES_PASSWORD`, `WEBHOOK_SECRET` и
+`KIE_CALLBACK_SECRET`. Для первого запуска оставьте:
 
 ```dotenv
 APP_DOMAIN=tma.pixlbot.ru
 TMA_URL=https://tma.pixlbot.ru
+POSTGRES_VOLUME_NAME=pixlbot_v2_postgres_data
 TELEGRAM_BOT_ENABLED=true
 TELEGRAM_TEST_MODE=false
 WEBHOOK_ENABLED=false
@@ -35,35 +36,34 @@ PAYMENT_CLEANUP_ENABLED=false
 ```
 
 Для `POSTGRES_PASSWORD` используйте длинное значение только из латинских букв и
-цифр: Compose подставляет его и в PostgreSQL, и в URL подключения backend.
+цифр: Compose подставляет его также в URL подключения backend.
 
-Не публикуйте `.env.test` и не присылайте его содержимое в чат.
-
-## 3. Проверить Compose
+## 3. Проверить конфигурацию и backup
 
 ```bash
-docker compose \
-  --env-file .env.test \
-  -f compose.test.yaml \
-  config --quiet
+docker compose --env-file .env.test -f compose.test.yaml config --quiet
+
+echo \
+  "b013c988b027f4d71ac3079f4bdb3bca9b8c3b37290558149d8e65029a02ac5b  /home/bot/pixlbot-backups/pixlbot_20260731_080053.dump" \
+  | sha256sum --check
 ```
 
-## 4. Запустить только новый PostgreSQL
+Если dump был перемещён, замените только путь, не checksum.
+
+## 4. Запустить постоянный PostgreSQL
 
 ```bash
-docker compose \
-  --env-file .env.test \
-  -f compose.test.yaml \
-  up -d postgres
+docker compose --env-file .env.test -f compose.test.yaml up -d postgres
+docker volume inspect pixlbot_v2_postgres_data
 ```
 
-Проверьте, что используется новый project `pixlbot-next-test`, а не legacy
-containers или volumes.
+Явное имя volume не зависит от имени Compose project. Будущая смена имени
+окружения не создаст незаметно другую пустую БД.
 
 ## 5. Восстановить legacy dump
 
-Команда ниже изменяет только новую test-БД. Перед выполнением проверьте путь к
-backup и имя Compose project.
+Следующая команда перезаписывает целевую БД `pixlbot` внутри нового volume.
+Backend на этом этапе ещё не запущен.
 
 ```bash
 docker compose \
@@ -80,44 +80,25 @@ docker compose \
   < /home/bot/pixlbot-backups/pixlbot_20260731_080053.dump
 ```
 
-После restore не запускайте весь Compose: сначала нужно принять legacy schema.
-
-## 6. Проверить и согласовать legacy schema
+Проверьте, что dump содержит ожидаемую legacy revision:
 
 ```bash
 docker compose \
   --env-file .env.test \
   -f compose.test.yaml \
-  --profile tools \
-  run --rm db-legacy check
+  run --rm migrate python -m alembic current
 ```
 
-Первый check должен показать различия трёх native PostgreSQL enums. Legacy schema
-использует native enum types, а новая baseline — `VARCHAR`. Согласуйте их явной
-транзакционной командой:
+Ожидаемый результат: `f7d735a7befd`.
+
+## 6. Применить обычные миграции
 
 ```bash
 docker compose \
   --env-file .env.test \
   -f compose.test.yaml \
-  --profile tools \
-  run --rm db-legacy reconcile-enums --confirm RECONCILE_LEGACY_ENUMS
-```
+  run --rm migrate
 
-Повторите `db-legacy check`. Adoption разрешён только если revision равна
-`f7d735a7befd`, а schema diff теперь пуст:
-
-```bash
-docker compose \
-  --env-file .env.test \
-  -f compose.test.yaml \
-  --profile tools \
-  run --rm db-legacy adopt --confirm ADOPT_LEGACY_SCHEMA
-```
-
-Затем проверьте Alembic:
-
-```bash
 docker compose \
   --env-file .env.test \
   -f compose.test.yaml \
@@ -129,37 +110,39 @@ docker compose \
   run --rm migrate python -m alembic check
 ```
 
-Если после reconciliation schema diff не пуст, операция откатится. Сохраните
-вывод и не изменяйте revision вручную.
+Ожидаемый head: `20260805_0001`. `alembic check` должен сообщить, что новых
+операций не обнаружено. При другом результате остановитесь и сохраните вывод.
 
-## 7. Обезвредить фоновые сообщения
+## 7. Проверить и обезвредить test-данные
 
-```bash
-docker compose \
-  --env-file .env.test \
-  -f compose.test.yaml \
-  --profile tools \
-  run --rm db-legacy sanitize --confirm SANITIZE_LEGACY_TEST_DATA
-```
-
-Команда отменяет pending scheduled messages и выключает funnel steps в копии БД.
-Кроме того, `FUNNEL_ENABLED=false` и `PAYMENT_CLEANUP_ENABLED=false` не дают
-backend снова запустить эти фоновые обработчики на первом стенде.
-
-Проверьте количество данных:
+Сначала сравните количество строк с ожидаемым:
 
 ```bash
 docker compose \
   --env-file .env.test \
   -f compose.test.yaml \
   --profile tools \
-  run --rm db-legacy summary
+  run --rm db-tools summary
 ```
 
-## 8. Выполнить seed
+Для test-бота отмените старые pending messages и отключите funnel steps:
 
-Seed обновляет каталог моделей и цены. Запускайте его только после проверки
-restore и summary:
+```bash
+docker compose \
+  --env-file .env.test \
+  -f compose.test.yaml \
+  --profile tools \
+  run --rm db-tools sanitize --confirm SANITIZE_LEGACY_TEST_DATA
+```
+
+Это test-only операция. При будущем production cutover решение о сохранении
+pending messages принимается отдельно. Дополнительно фоновые workers выключены
+через `.env.test`.
+
+## 8. Обновить каталог моделей
+
+Seed изменяет providers, models, pricing variants и packages. Выполните его после
+проверки summary:
 
 ```bash
 docker compose \
@@ -172,32 +155,53 @@ docker compose \
 ## 9. Запустить приложение
 
 ```bash
-docker compose \
-  --env-file .env.test \
-  -f compose.test.yaml \
-  up -d --build
+docker compose --env-file .env.test -f compose.test.yaml up -d --build
 ```
 
-Caddy автоматически запросит сертификат для `tma.pixlbot.ru`. DNS должен уже
-указывать на сервер, а TCP 80/443 должны быть доступны извне.
+Повторный запуск migration будет no-op. Caddy запросит сертификат для
+`tma.pixlbot.ru` и сохранит ACME state в постоянном volume.
 
-## 10. Проверка
+## 10. Smoke-проверка
 
 ```bash
 docker compose --env-file .env.test -f compose.test.yaml ps
-docker compose --env-file .env.test -f compose.test.yaml logs --tail=100 tma backend
+docker compose --env-file .env.test -f compose.test.yaml logs --tail=100 migrate backend tma
 curl --fail https://tma.pixlbot.ru/health
 ```
 
-После этого настройте Menu Button/Mini App URL нового бота на
-`https://tma.pixlbot.ru` и проверьте `/start`, открытие TMA, пользователя, баланс
-и список моделей.
+Настройте Menu Button нового бота на `https://tma.pixlbot.ru` и проверьте
+`/start`, открытие TMA, пользователя, баланс и список моделей.
 
-## Откат
+## Последующие deploy
+
+До каждой новой migration создайте backup текущего volume:
+
+```bash
+mkdir -p /home/bot/pixlbot-backups
+BACKUP_FILE="/home/bot/pixlbot-backups/predeploy_$(date +%Y%m%d_%H%M%S).dump"
+
+docker compose \
+  --env-file .env.test \
+  -f compose.test.yaml \
+  exec -T postgres \
+  pg_dump --username=pixlbot --dbname=pixlbot --format=custom \
+  > "$BACKUP_FILE"
+
+sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
+
+git pull --ff-only
+docker compose --env-file .env.test -f compose.test.yaml build
+docker compose --env-file .env.test -f compose.test.yaml run --rm migrate
+docker compose --env-file .env.test -f compose.test.yaml up -d
+curl --fail https://tma.pixlbot.ru/health
+```
+
+## Остановка и восстановление
 
 ```bash
 docker compose --env-file .env.test -f compose.test.yaml stop
 ```
 
-Не используйте `down -v`: PostgreSQL и Caddy certificates находятся в named
-volumes. Legacy project остаётся отдельным и может быть запущен независимо.
+Не используйте `down -v`. Если migration повредила данные, не выполняйте
+непроверенный downgrade на рабочей БД: остановите приложение и восстановите
+последний predeploy dump в проверенный volume.

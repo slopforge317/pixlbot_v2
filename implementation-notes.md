@@ -1,50 +1,47 @@
 # Заметки по реализации
 
-## Зафиксированные входные данные
+## Цель
 
-- Test-домен: `tma.pixlbot.ru`.
-- GitHub: `https://github.com/slopforge317/pixlbot_v2.git`.
-- Порты 80 и 443 на сервере свободны.
-- Legacy backup создан, проверен через `pg_restore --list` и скопирован с сервера.
-- Контрольная сумма backup:
-  `b013c988b027f4d71ac3079f4bdb3bca9b8c3b37290558149d8e65029a02ac5b`.
+- Подготовить обычную Alembic-цепочку для развёртывания восстановленного legacy
+  dump на test-сервере без ручной подмены revision.
 
-## Принятые решения
+## Зафиксированные решения
 
-- Первый deployable baseline содержит только `compose.test.yaml`.
-- Локальный mock/dev-стенд откладывается; сервер проверяется через реального тестового бота.
-- Caddy одновременно служит runtime для TMA, reverse proxy для backend и TLS endpoint.
-- Mock Telegram auth удаляется, чтобы server test не содержал bypass production-аутентификации.
-- Telegram webhook не используется на первом этапе; bot работает через polling.
-- Legacy-БД не подключается физическим volume. Используется только `pg_dump`/`pg_restore`.
-- Принятие legacy Alembic history выполняется отдельной явной командой после schema diff.
-- Legacy dump содержит три native PostgreSQL enum types, тогда как новая baseline
-  использует `VARCHAR`. Добавлен отдельный транзакционный reconciliation шаг.
-- Funnel messaging и stale payment cleanup имеют отдельные feature flags и
-  отключены на первом test-стенде, чтобы копия legacy-БД не создавала side effects.
+- Legacy revision `f7d735a7befd` используется как squashed baseline.
+- Пользовательские данные остаются в PostgreSQL dump и не включаются в миграции.
+- Все отличия legacy schema от текущей модели оформляются следующей обычной
+  Alembic migration.
+- Baseline создаёт native enum на чистой БД, а bridge migration переводит их в
+  текущие `VARCHAR`; поэтому clean install и restore проходят одну цепочку.
+- Постоянные Docker volumes получили явные имена `pixlbot_v2_*`, чтобы данные не
+  зависели от будущего переименования Compose project.
+- Старый adoption helper удалён. Отдельный `database_tools.py` оставляет только
+  test-only sanitization и сводку количества данных.
 
-## Риски и последующие действия
+## Компромиссы и риски
 
-- Legacy revision несовместима с новой initial migration. Автоматически запускать
-  `migrate` сразу после restore нельзя.
-- В восстановленной базе могут быть pending funnel messages и другие фоновые записи.
-  Их нужно обезвредить до запуска нового бота.
-- Seed обновляет модели и цены и деактивирует отсутствующие pricing variants, поэтому
-  на восстановленной базе он запускается только после проверки.
-- Генерации, KIE callback, S3 uploads, YooKassa и monitoring остаются вне первого этапа.
+- Dump не включается в репозиторий и не исполняется из Alembic: миграции хранят
+  структуру и преобразования, а `pg_restore` переносит реальные данные.
+- Полное соответствие dump baseline окончательно подтверждается на сервере через
+  `alembic upgrade head` и `alembic check`. При дополнительных отличиях запуск
+  backend запрещён до добавления новой migration.
+- `sanitize` отменяет pending messages и предназначен только для test-копии; при
+  production cutover его нельзя запускать автоматически.
 
-## Ход реализации
+## Ход работы
 
-- План сохранён в `plans/001-server-test-deployment.md`.
-- Compose сведён к самостоятельному `compose.test.yaml`; dev/prod overlays удалены.
-- Monitoring Compose также отложен; конфигурации в `infra/monitoring` сохранены
-  для следующего этапа.
-- TMA runtime переведён с Nginx на Caddy 2.11.4.
-- Добавлен `adopt_legacy_schema.py` с check, enum reconciliation, adoption,
-  sanitization и summary.
-- Статические проверки backend, auth unit tests, TMA typecheck/build и Compose
-  config проходят. Полный Docker test и image/Caddy runtime validation локально
-  недоступны, потому что Docker daemon на рабочей машине не запущен.
-- Git remote `origin` привязан к `https://github.com/slopforge317/pixlbot_v2.git`;
-  удалённый репозиторий не содержит веток и готов к первичной публикации.
-- Baseline опубликован в `origin/main`; первичный implementation commit — `56a5125`.
+- Initial migration заменена на squashed legacy baseline `f7d735a7befd`.
+- Добавлена обычная migration `20260805_0001` для нормализации трёх enum.
+- Compose и deployment docs переведены с adoption workflow на `upgrade head`.
+- `scripts/test.ps1` использует отдельный volume
+  `pixlbot_pytest_postgres_data` и перед pytest проверяет реальный migration path
+  `base → f7d735a7befd → head` на отдельной базе.
+
+## Проверки
+
+- `scripts/check.ps1` проходит: Black, isort, flake8, pyright, Alembic graph и
+  offline SQL, TMA typecheck/build, Compose config.
+- Offline upgrade и downgrade SQL успешно генерируются для PostgreSQL.
+- CLI `database_tools.py` и PowerShell syntax `scripts/test.ps1` проверены.
+- Локальный Docker daemon не запущен, поэтому выполнение DDL на живой PostgreSQL
+  и полный pytest остаются обязательной первой проверкой на сервере.

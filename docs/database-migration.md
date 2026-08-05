@@ -1,44 +1,80 @@
-# Принятие legacy-БД
+# Миграции legacy-БД
 
-## Почему требуется adoption
+## Цепочка Alembic
 
-Legacy-БД была создана через SQLAlchemy `create_all`. Её Alembic history содержит
-пустую initial revision и последующую revision `f7d735a7befd`. Новый репозиторий
-имеет воспроизводимую initial migration `20260727_0001`, которая создаёт всю схему
-на чистой PostgreSQL.
+Новая история начинается со squashed baseline, revision которой совпадает с
+revision в legacy dump:
 
-Запуск новой initial migration поверх восстановленной legacy-БД попытался бы
-повторно создать существующие таблицы. Поэтому новая baseline принимается через
-явную операцию, но только после проверки совместимости схемы.
+```text
+f7d735a7befd  legacy baseline
+      ↓
+20260805_0001  native PostgreSQL enums → VARCHAR
+      ↓
+будущие миграции
+```
 
-## Инструмент
+`f7d735a7befd_legacy_baseline.py` создаёт полную legacy-схему на чистой БД. Она
+использует те же три native PostgreSQL enum, которые находятся в dump.
 
-`apps/backend/scripts/adopt_legacy_schema.py` поддерживает команды:
+`20260805_0001_normalize_legacy_enums.py` переводит их в типы текущей ORM-схемы:
 
-- `check` — проверяет старую revision и сравнивает БД с ORM metadata;
-- `reconcile-enums` — транзакционно переводит три legacy native enums в `VARCHAR`;
-- `adopt` — заменяет revision на `20260727_0001`, только если diff пуст;
-- `sanitize` — отменяет pending messages и отключает funnel steps в test-копии;
-- `summary` — показывает revision и количество строк в основных таблицах.
+- `funnel_steps.trigger_event` → `VARCHAR(21)`;
+- `funnel_steps.condition` → `VARCHAR(18)`;
+- `scheduled_messages.status` → `VARCHAR(9)`.
 
-Изменяющие команды требуют точных confirmation values. Они не запускаются
-автоматически вместе с backend.
+## Восстановленная база
 
-Legacy enum reconciliation затрагивает:
+В dump уже находится `alembic_version = f7d735a7befd`. Поэтому после
+`pg_restore` Alembic считает baseline выполненной и применяет только миграции,
+идущие после неё:
 
-- `funnel_steps.trigger_event`;
-- `funnel_steps.condition`;
-- `scheduled_messages.status`.
+```bash
+docker compose --env-file .env.test -f compose.test.yaml run --rm migrate
+```
 
-Если после преобразования остаётся любой другой schema diff, транзакция
-откатывается и adoption запрещается.
+Ручной `stamp`, подмена revision и отдельный adoption не требуются.
 
-## Правила безопасности
+После upgrade обязательно проверить соответствие схемы ORM metadata:
 
-1. Работать только с восстановленной копией в `pixlbot-next-test`.
-2. До adoption иметь проверенный dump и checksum вне сервера.
-3. Не выполнять `alembic stamp` вручную.
-4. Не продолжать при непустом schema diff.
-5. Не запускать backend до sanitization фоновых сообщений.
-6. Сравнить summary с исходной БД до seed.
-7. Не использовать `docker compose down -v`.
+```bash
+docker compose \
+  --env-file .env.test \
+  -f compose.test.yaml \
+  run --rm migrate python -m alembic check
+```
+
+Если `alembic check` на восстановленном dump обнаружит дополнительные отличия,
+backend не запускают. Отличия оформляются новой Alembic migration и сначала
+проверяются на новой копии dump.
+
+## Чистая база
+
+На чистом PostgreSQL `alembic upgrade head` последовательно создаёт legacy
+baseline, нормализует enum и применяет все последующие revision. Поэтому схема
+остаётся воспроизводимой без dump; пользовательских данных в ней не будет.
+
+## Следующие изменения
+
+Каждое изменение SQLAlchemy-моделей сопровождается новой migration с
+`down_revision`, указывающей на текущий head. До commit выполняются:
+
+```powershell
+cd apps/backend
+$env:PYTHONPATH = "app"
+poetry run alembic revision --autogenerate -m "describe change"
+poetry run alembic upgrade head
+poetry run alembic check
+```
+
+Сгенерированную migration необходимо проверить вручную. Преобразования данных,
+без которых новая версия приложения не работает, размещаются в `upgrade()`, а не
+в seed.
+
+## Данные и backup
+
+- Реальные пользователи и операции восстанавливаются только через `pg_restore`.
+- Dump и секреты не хранятся в Git.
+- Перед каждой migration на рабочей БД создаётся новый custom-format backup и
+  checksum.
+- `seed` используется только для управляемого обновления каталога моделей и цен.
+- `docker compose down -v` удаляет постоянную БД и запрещён для рабочего стенда.

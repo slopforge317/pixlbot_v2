@@ -29,11 +29,12 @@ Telegram client / Browser
 
 ## База данных
 
-- Новая чистая БД создаётся initial migration `20260727_0001`.
-- Legacy-БД содержит revision `f7d735a7befd` и не может автоматически пройти
-  новый migration graph.
-- Legacy schema принимается новой baseline только после автоматического сравнения
-  фактической схемы с SQLAlchemy metadata.
+- Squashed baseline использует legacy revision `f7d735a7befd` и создаёт точную
+  старую схему на чистой PostgreSQL.
+- Восстановленная legacy-БД автоматически продолжает обычную Alembic-цепочку с
+  migration `20260805_0001`, которая нормализует три native enum.
+- PostgreSQL хранится в явно именованном volume `pixlbot_v2_postgres_data`, не
+  зависящем от имени Compose project.
 - Runtime и seed не создают таблицы через `create_all`; production/test schema
   управляется Alembic.
 

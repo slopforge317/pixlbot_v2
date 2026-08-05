@@ -31,6 +31,13 @@ try {
         poetry run flake8 app tests scripts alembic
     }
     Invoke-CheckedStep "Backend type checking" { poetry run pyright }
+    Invoke-CheckedStep "Alembic migration graph" {
+        poetry run alembic heads
+        if ($LASTEXITCODE -ne 0) {
+            return
+        }
+        poetry run alembic upgrade head --sql | Out-Null
+    }
 }
 finally {
     Pop-Location

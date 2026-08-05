@@ -27,7 +27,7 @@
   мониторинг и текущие архитектурные ограничения.
 - `docs/development.md` — локальные зависимости, проверки, tests и seed.
 - `docs/deployment.md` — пошаговый запуск test-стенда на `tma.pixlbot.ru`.
-- `docs/database-migration.md` — проверка и принятие legacy-БД новой Alembic baseline.
+- `docs/database-migration.md` — legacy baseline и последующая Alembic-цепочка.
 - Backend-документация находится в `apps/backend/docs`; читать её при работе
   с backend.
 - Правила и документация TMA находятся в `apps/tma/AGENTS.md`, `apps/tma/DESIGN.md`
