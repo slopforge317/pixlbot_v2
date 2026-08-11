@@ -50,19 +50,23 @@ Bucket остаётся приватным. Для browser upload через pre
 
 ## Upload flow
 
-1. TMA вызывает `POST /api/storage/presign-upload`.
+1. Сразу после выбора файла TMA показывает local preview и вызывает
+   `POST /api/storage/presign-upload`.
 2. TMA отправляет файл напрямую в R2 через presigned PUT и точный
    `Content-Type` из ответа backend.
-3. TMA отправляет `object_key` в поле изображения `POST /api/generations`.
-4. Backend перед вызовом KIE заменяет `object_key` на presigned GET URL.
+3. До окончания всех upload кнопка генерации заблокирована. После успеха TMA
+   хранит полученный `object_key`.
+4. TMA отправляет `object_key` в поле изображения `POST /api/generations`.
+5. Backend перед вызовом KIE заменяет `object_key` на presigned GET URL.
 
 ## Smoke test
 
 1. Откройте TMA внутри Telegram и выберите модель с референсом.
-2. Добавьте JPG, PNG или WEBP и запустите генерацию.
-3. В browser network должны завершиться `presign-upload`, PUT в R2 и
+2. Добавьте JPG, PNG или WEBP: статус должен смениться с `Загрузка...` на
+   `Загружено`, а объект — появиться в R2 до запуска генерации.
+3. Запустите генерацию.
+4. В browser network должны завершиться `presign-upload`, PUT в R2 и
    `POST /api/generations`.
-4. В R2 должен появиться объект с prefix `uploads/<user_id>/`.
 5. В backend logs не должно быть ошибок `Cloudflare R2 storage is not configured`
    или `SignatureDoesNotMatch`.
 

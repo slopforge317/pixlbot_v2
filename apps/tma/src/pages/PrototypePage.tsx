@@ -46,7 +46,7 @@ import {
   selectModelForReference,
   sortProviders,
 } from "@/lib/model-catalog"
-import { R2UploadError, uploadFileToR2 } from "@/lib/r2-upload"
+import { uploadFileToR2 } from "@/lib/r2-upload"
 
 const promptPlaceholder =
   "Портрет в мягком студийном свете, чистый фон, естественная кожа, высокая детализация"
@@ -55,13 +55,17 @@ const allowedReferenceTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 
 type ScreenId = "generation" | "history" | "payment"
 type HistoryStatus = "Готово" | "В работе" | "Ошибка"
+type ReferenceUploadStatus = "uploading" | "uploaded" | "error"
 type ReferenceImage = {
   file: File
   name: string
+  objectKey?: string
+  status: ReferenceUploadStatus
+  uploadError?: string
   url: string
 }
 type ModelsLoadStatus = "idle" | "loading" | "success" | "error"
-type GenerationStatus = "idle" | "uploading" | "submitting" | "queued" | "error"
+type GenerationStatus = "idle" | "submitting" | "queued" | "error"
 
 function formatCreditPrice(price: number | null) {
   if (price === null) {
@@ -101,14 +105,22 @@ function getGenerationErrorMessage(error: unknown) {
   if (error instanceof UnauthorizedError) {
     return "Нет Telegram initData. Откройте Mini App внутри Telegram."
   }
-  if (error instanceof R2UploadError) {
-    return error.message
-  }
   if (error instanceof Error) {
     return `Не удалось создать задачу: ${error.message}`
   }
 
   return "Не удалось создать задачу."
+}
+
+function getReferenceUploadErrorMessage(error: unknown) {
+  if (error instanceof UnauthorizedError) {
+    return "Откройте Mini App внутри Telegram"
+  }
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return "Не удалось загрузить изображение"
 }
 
 const navItems: Array<{ id: ScreenId; label: string }> = [
@@ -226,6 +238,22 @@ export function PrototypePage() {
 
   const referenceMaxSizeMb = referenceField?.schema.max_image_size_mb ?? 10
   const referenceMaxImages = referenceField?.schema.max_images ?? 1
+  const referenceUploadState = useMemo(() => {
+    if (referenceImages.length === 0) {
+      return "idle" as const
+    }
+    if (referenceImages.some((image) => image.status === "error")) {
+      return "error" as const
+    }
+    if (referenceImages.some((image) => image.status === "uploading")) {
+      return "uploading" as const
+    }
+
+    return "done" as const
+  }, [referenceImages])
+  const referencesReady = referenceImages.every(
+    (image) => image.status === "uploaded" && Boolean(image.objectKey),
+  )
 
   const loadModels = useCallback(async () => {
     setModelsLoadStatus("loading")
@@ -293,6 +321,38 @@ export function PrototypePage() {
     }
   }, [])
 
+  async function uploadReferenceImage(image: ReferenceImage) {
+    try {
+      const objectKey = await uploadFileToR2(image.file, referenceMaxSizeMb)
+
+      setReferenceImages((current) =>
+        current.map((candidate) =>
+          candidate.url === image.url
+            ? {
+                ...candidate,
+                objectKey,
+                status: "uploaded",
+                uploadError: undefined,
+              }
+            : candidate,
+        ),
+      )
+    } catch (error) {
+      setReferenceImages((current) =>
+        current.map((candidate) =>
+          candidate.url === image.url
+            ? {
+                ...candidate,
+                objectKey: undefined,
+                status: "error",
+                uploadError: getReferenceUploadErrorMessage(error),
+              }
+            : candidate,
+        ),
+      )
+    }
+  }
+
   function handleReferenceChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
 
@@ -320,6 +380,7 @@ export function PrototypePage() {
     const nextImages = acceptedFiles.map((file) => ({
       file,
       name: file.name,
+      status: "uploading" as const,
       url: URL.createObjectURL(file),
     }))
 
@@ -333,6 +394,7 @@ export function PrototypePage() {
     }
 
     setReferenceError("")
+    setGenerationError("")
     setReferenceImages((current) => {
       if (referenceMaxImages === 1) {
         current.forEach((image) => URL.revokeObjectURL(image.url))
@@ -342,6 +404,24 @@ export function PrototypePage() {
       return [...current, ...nextImages]
     })
     setStatus("idle")
+    nextImages.forEach((image) => void uploadReferenceImage(image))
+  }
+
+  function retryReferenceUpload(image: ReferenceImage) {
+    const retryingImage: ReferenceImage = {
+      ...image,
+      objectKey: undefined,
+      status: "uploading",
+      uploadError: undefined,
+    }
+    setReferenceImages((current) =>
+      current.map((candidate) =>
+        candidate.url === image.url ? retryingImage : candidate,
+      ),
+    )
+    setGenerationError("")
+    setStatus("idle")
+    void uploadReferenceImage(retryingImage)
   }
 
   function removeReferenceImage(url: string) {
@@ -353,28 +433,25 @@ export function PrototypePage() {
       return current.filter((image) => image.url !== url)
     })
     setReferenceError("")
+    setGenerationError("")
     setStatus("idle")
   }
 
   async function handleGenerate() {
-    if (!currentModel || !currentVariant || prompt.trim().length === 0) {
+    if (
+      !currentModel ||
+      !currentVariant ||
+      prompt.trim().length === 0 ||
+      !referencesReady
+    ) {
       return
     }
 
     setGenerationError("")
 
     try {
-      if (referenceImages.length > 0) {
-        setStatus("uploading")
-      } else {
-        setStatus("submitting")
-      }
-
-      const objectKeys = await Promise.all(
-        referenceImages.map((image) =>
-          uploadFileToR2(image.file, referenceMaxSizeMb),
-        ),
-      )
+      setStatus("submitting")
+      const objectKeys = referenceImages.map((image) => image.objectKey as string)
       const input: Record<string, unknown> = {
         prompt: prompt.trim(),
         ...parameterValues,
@@ -521,7 +598,7 @@ export function PrototypePage() {
               </div>
               <Attachment
                 className="grid min-h-112 w-full cursor-pointer place-items-center rounded-input bg-background p-16 text-center hover:bg-muted"
-                state={referenceImages.length > 0 ? "done" : "idle"}
+                state={referenceUploadState}
               >
                 <AttachmentTrigger asChild>
                   <input
@@ -552,21 +629,40 @@ export function PrototypePage() {
                             {image.name}
                           </AttachmentTitle>
                           <AttachmentDescription className="mt-0 text-caption">
-                            {referenceImages.length} из {referenceMaxImages}
+                            {image.status === "uploading"
+                              ? "Загрузка..."
+                              : image.status === "error"
+                                ? image.uploadError
+                                : "Загружено"}
                           </AttachmentDescription>
                         </AttachmentContent>
-                        <button
-                          aria-label={`Удалить ${image.name}`}
-                          className="relative z-20 rounded-button border border-border px-8 py-4 text-caption font-medium hover:bg-muted"
-                          onClick={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            removeReferenceImage(image.url)
-                          }}
-                          type="button"
-                        >
-                          Удалить
-                        </button>
+                        <div className="relative z-20 flex gap-4">
+                          {image.status === "error" ? (
+                            <button
+                              className="rounded-button border border-border px-8 py-4 text-caption font-medium hover:bg-muted"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                retryReferenceUpload(image)
+                              }}
+                              type="button"
+                            >
+                              Повторить
+                            </button>
+                          ) : null}
+                          <button
+                            aria-label={`Удалить ${image.name}`}
+                            className="rounded-button border border-border px-8 py-4 text-caption font-medium hover:bg-muted"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              removeReferenceImage(image.url)
+                            }}
+                            type="button"
+                          >
+                            Удалить
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -633,7 +729,7 @@ export function PrototypePage() {
                 !currentModel ||
                 !currentVariant ||
                 prompt.trim().length === 0 ||
-                status === "uploading" ||
+                !referencesReady ||
                 status === "submitting" ||
                 status === "queued"
               }
@@ -642,9 +738,7 @@ export function PrototypePage() {
               type="button"
               variant="action"
             >
-              {status === "uploading"
-                ? "Загрузка фото..."
-                : status === "submitting"
+              {status === "submitting"
                   ? "Создание задачи..."
                   : status === "queued"
                     ? "Задача отправлена"

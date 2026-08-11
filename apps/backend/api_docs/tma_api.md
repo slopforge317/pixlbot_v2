@@ -679,7 +679,7 @@ R2_UPLOAD_MAX_SIZE_BYTES=31457280
 
 ### Upload flow
 
-1. Frontend calls `/api/storage/presign-upload`.
+1. Сразу после выбора файла frontend вызывает `/api/storage/presign-upload`.
 2. Frontend uploads file directly:
 
 ```ts
