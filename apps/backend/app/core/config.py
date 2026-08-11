@@ -50,15 +50,15 @@ class Settings(BaseSettings):
     # Bonuses
     welcome_bonus_credits: int = 100  # Credits granted to new users
 
-    # Yandex Cloud Storage (S3-compatible)
-    s3_access_key_id: str = ""
-    s3_secret_access_key: str = ""
-    s3_bucket_name: str = ""
-    s3_endpoint_url: str = "https://storage.yandexcloud.net"
-    s3_region: str = "ru-central1"
-    s3_upload_max_size_bytes: int = 30 * 1024 * 1024  # 30 MB catalog maximum
-    s3_presign_upload_expires: int = 600  # 10 min for PUT
-    s3_presign_download_expires: int = 3600  # 1 hour for GET
+    # Cloudflare R2 (S3-compatible API)
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket_name: str = ""
+    r2_endpoint_url: str = ""
+    r2_region: str = "auto"
+    r2_upload_max_size_bytes: int = 30 * 1024 * 1024  # 30 MB catalog maximum
+    r2_presign_upload_expires: int = 600  # 10 min for PUT
+    r2_presign_download_expires: int = 3600  # 1 hour for GET
 
     # YooKassa Payments
     yookassa_shop_id: str = ""

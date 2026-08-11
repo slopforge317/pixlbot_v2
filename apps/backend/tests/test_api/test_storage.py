@@ -11,7 +11,7 @@ def mock_storage_service() -> MagicMock:
     """Create a mock StorageService."""
     mock = MagicMock()
     mock.generate_presigned_put_url.return_value = (
-        "https://storage.yandexcloud.net/test-bucket/signed-put-url",
+        "https://test-bucket.account-id.r2.cloudflarestorage.com/signed-put-url",
         "uploads/1/550e8400-e29b-41d4-a716-446655440000.jpg",
     )
     return mock
@@ -144,7 +144,7 @@ class TestPresignUpload:
         """Test 503 when storage service is not configured."""
         with patch(
             "api.routes.storage.get_storage_service",
-            side_effect=RuntimeError("S3 storage is not configured"),
+            side_effect=RuntimeError("Cloudflare R2 storage is not configured"),
         ):
             response = await auth_client.post(
                 "/api/storage/presign-upload",

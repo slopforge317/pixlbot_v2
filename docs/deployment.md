@@ -21,8 +21,8 @@ chmod 600 .env.test
 nano .env.test
 ```
 
-Замените `BOT_TOKEN`, `POSTGRES_PASSWORD`, `WEBHOOK_SECRET` и
-`KIE_CALLBACK_SECRET`. Для первого запуска оставьте:
+Замените `BOT_TOKEN`, `POSTGRES_PASSWORD`, `WEBHOOK_SECRET`,
+`KIE_CALLBACK_SECRET` и Cloudflare R2 credentials. Для первого запуска оставьте:
 
 ```dotenv
 APP_DOMAIN=tma.pixlbot.ru
@@ -33,11 +33,19 @@ TELEGRAM_TEST_MODE=false
 WEBHOOK_ENABLED=false
 FUNNEL_ENABLED=false
 PAYMENT_CLEANUP_ENABLED=false
-S3_UPLOAD_MAX_SIZE_BYTES=31457280
+R2_ACCESS_KEY_ID=<Access Key ID>
+R2_SECRET_ACCESS_KEY=<Secret Access Key>
+R2_BUCKET_NAME=<bucket name>
+R2_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_REGION=auto
+R2_UPLOAD_MAX_SIZE_BYTES=31457280
 ```
 
 Для `POSTGRES_PASSWORD` используйте длинное значение только из латинских букв и
 цифр: Compose подставляет его также в URL подключения backend.
+
+R2 bucket должен оставаться приватным. CORS, lifecycle и smoke-проверка описаны
+в `docs/cloudflare-r2.md`.
 
 ## 3. Проверить конфигурацию и backup
 

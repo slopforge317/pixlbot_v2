@@ -18,7 +18,7 @@ async def presign_upload(
     request: PresignUploadRequest,
     user: CurrentUser,
 ) -> PresignUploadResponse:
-    """Get a presigned PUT URL for uploading a file to S3.
+    """Get a presigned PUT URL for uploading a file to Cloudflare R2.
 
     The client should PUT the file directly to the returned URL
     with the specified Content-Type header.

@@ -15,7 +15,7 @@ Telegram client / Browser
           |
           +---- Telegram Bot API (polling)
           +---- KIE API (следующий этап)
-          +---- S3 storage (следующий этап)
+          +---- Cloudflare R2 (user uploads)
           +---- YooKassa (следующий этап)
 ```
 
@@ -43,5 +43,8 @@ Telegram client / Browser
 - Generations используют FastAPI `BackgroundTasks`, а не устойчивую очередь.
 - Telegram polling и периодические задачи находятся в процессе API, поэтому
   backend пока запускается в одном экземпляре.
-- KIE callback, S3 uploads и payments не проверяются на первом deployment этапе.
+- KIE callback и payments не проверяются на первом deployment этапе.
+- Пользовательские изображения загружаются напрямую из TMA в приватный
+  Cloudflare R2 bucket через presigned PUT URL. Backend передаёт KIE временные
+  presigned GET URL; lifecycle удаляет объекты с prefix `uploads/` через 1 день.
 - Monitoring не входит в первый запуск test-стенда.

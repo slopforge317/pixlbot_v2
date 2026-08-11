@@ -215,7 +215,7 @@ def _build_context(
 
 
 def _replace_object_keys_with_urls(input_data: dict[str, Any]) -> dict[str, Any]:
-    """Replace S3 object keys with presigned GET URLs in input data.
+    """Replace R2 object keys with presigned GET URLs in input data.
 
     Scans input_data values; if a value is a list[str] where all items
     match OBJECT_KEY_PATTERN, replaces each with a presigned GET URL.
@@ -277,7 +277,7 @@ async def _execute_generation(
     # Ensure prompt from DB column (authoritative)
     input_data["prompt"] = job.prompt
 
-    # Replace S3 object keys with presigned GET URLs
+    # Replace R2 object keys with presigned GET URLs
     try:
         input_data = _replace_object_keys_with_urls(input_data)
     except Exception as e:

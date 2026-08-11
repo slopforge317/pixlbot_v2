@@ -8,7 +8,13 @@ import {
 } from "react"
 import { BorderBeam } from "border-beam"
 
-import { api, type FieldOptionValue, type Provider } from "@/api"
+import {
+  api,
+  InsufficientCreditsAPIError,
+  UnauthorizedError,
+  type FieldOptionValue,
+  type Provider,
+} from "@/api"
 import { SurfaceCard } from "@/components/primitives/surface-card"
 import {
   Attachment,
@@ -40,6 +46,7 @@ import {
   selectModelForReference,
   sortProviders,
 } from "@/lib/model-catalog"
+import { R2UploadError, uploadFileToR2 } from "@/lib/r2-upload"
 
 const promptPlaceholder =
   "Портрет в мягком студийном свете, чистый фон, естественная кожа, высокая детализация"
@@ -49,10 +56,12 @@ const allowedReferenceTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 type ScreenId = "generation" | "history" | "payment"
 type HistoryStatus = "Готово" | "В работе" | "Ошибка"
 type ReferenceImage = {
+  file: File
   name: string
   url: string
 }
 type ModelsLoadStatus = "idle" | "loading" | "success" | "error"
+type GenerationStatus = "idle" | "uploading" | "submitting" | "queued" | "error"
 
 function formatCreditPrice(price: number | null) {
   if (price === null) {
@@ -83,6 +92,23 @@ function getModelsErrorMessage(error: unknown) {
   }
 
   return "Не удалось загрузить модели."
+}
+
+function getGenerationErrorMessage(error: unknown) {
+  if (error instanceof InsufficientCreditsAPIError) {
+    return `Недостаточно кредитов: нужно ${error.required}, доступно ${error.balance}`
+  }
+  if (error instanceof UnauthorizedError) {
+    return "Нет Telegram initData. Откройте Mini App внутри Telegram."
+  }
+  if (error instanceof R2UploadError) {
+    return error.message
+  }
+  if (error instanceof Error) {
+    return `Не удалось создать задачу: ${error.message}`
+  }
+
+  return "Не удалось создать задачу."
 }
 
 const navItems: Array<{ id: ScreenId; label: string }> = [
@@ -162,7 +188,8 @@ export function PrototypePage() {
   const referenceImagesRef = useRef<ReferenceImage[]>([])
   const [referenceError, setReferenceError] = useState("")
   const [parameterValues, setParameterValues] = useState<Record<string, unknown>>({})
-  const [status, setStatus] = useState<"idle" | "queued">("idle")
+  const [status, setStatus] = useState<GenerationStatus>("idle")
+  const [generationError, setGenerationError] = useState("")
 
   const visibleProviders = useMemo(
     () => sortProviders(providers.filter((provider) => provider.gen_type === "image")),
@@ -291,6 +318,7 @@ export function PrototypePage() {
 
     const acceptedFiles = referenceMaxImages === 1 ? files.slice(0, 1) : files
     const nextImages = acceptedFiles.map((file) => ({
+      file,
       name: file.name,
       url: URL.createObjectURL(file),
     }))
@@ -326,6 +354,61 @@ export function PrototypePage() {
     })
     setReferenceError("")
     setStatus("idle")
+  }
+
+  async function handleGenerate() {
+    if (!currentModel || !currentVariant || prompt.trim().length === 0) {
+      return
+    }
+
+    setGenerationError("")
+
+    try {
+      if (referenceImages.length > 0) {
+        setStatus("uploading")
+      } else {
+        setStatus("submitting")
+      }
+
+      const objectKeys = await Promise.all(
+        referenceImages.map((image) =>
+          uploadFileToR2(image.file, referenceMaxSizeMb),
+        ),
+      )
+      const input: Record<string, unknown> = {
+        prompt: prompt.trim(),
+        ...parameterValues,
+      }
+
+      if (objectKeys.length > 0) {
+        const modelReferenceField = Object.entries(currentModel.input_schema).find(
+          ([, schema]) => schema.type === "array",
+        )
+        if (!modelReferenceField) {
+          throw new Error("Выбранная модель не принимает изображения")
+        }
+        input[modelReferenceField[0]] = objectKeys
+      }
+
+      setStatus("submitting")
+      await api.createGeneration({
+        model: {
+          id: currentModel.id,
+          api_model_id: currentModel.api_model_id,
+          title: currentModel.title,
+        },
+        variant: {
+          id: currentVariant.id,
+          price: currentVariant.price,
+          variant_values: currentVariant.variant_values,
+        },
+        input,
+      })
+      setStatus("queued")
+    } catch (error) {
+      setGenerationError(getGenerationErrorMessage(error))
+      setStatus("error")
+    }
   }
 
   return (
@@ -546,14 +629,30 @@ export function PrototypePage() {
         {activeScreen === "generation" ? (
           <footer className="grid gap-10 border-t border-border bg-background pt-12">
             <Button
-              disabled={!currentModel || !currentVariant || prompt.trim().length === 0}
-              onClick={() => setStatus("queued")}
+              disabled={
+                !currentModel ||
+                !currentVariant ||
+                prompt.trim().length === 0 ||
+                status === "uploading" ||
+                status === "submitting" ||
+                status === "queued"
+              }
+              onClick={() => void handleGenerate()}
               size="lg"
               type="button"
               variant="action"
             >
-              {status === "queued" ? "Задача отправлена" : "Запустить генерацию"}
+              {status === "uploading"
+                ? "Загрузка фото..."
+                : status === "submitting"
+                  ? "Создание задачи..."
+                  : status === "queued"
+                    ? "Задача отправлена"
+                    : "Запустить генерацию"}
             </Button>
+            {generationError ? (
+              <p className="text-caption text-red-600">{generationError}</p>
+            ) : null}
           </footer>
         ) : null}
       </Tabs>

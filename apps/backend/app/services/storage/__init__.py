@@ -1,4 +1,4 @@
-"""Storage service for S3-compatible object storage."""
+"""Storage service for Cloudflare R2 object storage."""
 
 from services.storage.service import StorageService, get_storage_service
 

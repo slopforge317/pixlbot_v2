@@ -636,7 +636,7 @@ Authorization: tma <initData>
 
 ## POST /api/storage/presign-upload
 
-Создает presigned PUT URL для прямой загрузки изображения в S3-compatible storage.
+Создает presigned PUT URL для прямой загрузки изображения в приватный Cloudflare R2 bucket через S3-compatible API.
 
 ### Request
 
@@ -664,14 +664,14 @@ Content-Type: application/json
 Default max file size is controlled by backend env:
 
 ```env
-S3_UPLOAD_MAX_SIZE_BYTES=10485760
+R2_UPLOAD_MAX_SIZE_BYTES=31457280
 ```
 
 ### Response 200
 
 ```json
 {
-  "upload_url": "https://storage.yandexcloud.net/bucket/uploads/1/file.png?...",
+  "upload_url": "https://bucket.account-id.r2.cloudflarestorage.com/uploads/1/file.png?...",
   "object_key": "uploads/1/550e8400-e29b-41d4-a716-446655440000.png",
   "content_type": "image/png"
 }

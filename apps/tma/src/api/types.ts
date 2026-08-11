@@ -169,7 +169,7 @@ export interface PaymentStatusResponse {
 }
 
 // =============================================================================
-// Storage (S3 presigned uploads)
+// Storage (Cloudflare R2 presigned uploads)
 // =============================================================================
 
 export interface PresignUploadRequest {

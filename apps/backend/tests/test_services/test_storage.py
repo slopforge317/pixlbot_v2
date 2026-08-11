@@ -3,19 +3,21 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from services.storage import service as storage_module
 from services.storage.service import (
     StorageService,
+    get_storage_service,
     is_valid_object_key,
 )
 
 
 @pytest.fixture
 def storage_service() -> StorageService:
-    """Create a StorageService with mocked boto3 client."""
+    """Create a Cloudflare R2 StorageService with mocked boto3 client."""
     with patch("services.storage.service.boto3") as mock_boto3:
         mock_client = MagicMock()
         mock_client.generate_presigned_url.return_value = (
-            "https://storage.yandexcloud.net/test-bucket/signed-url"
+            "https://test-bucket.account-id.r2.cloudflarestorage.com/signed-url"
         )
         mock_boto3.client.return_value = mock_client
 
@@ -23,8 +25,8 @@ def storage_service() -> StorageService:
             access_key_id="test_key",
             secret_access_key="test_secret",
             bucket_name="test-bucket",
-            endpoint_url="https://storage.yandexcloud.net",
-            region="ru-central1",
+            endpoint_url="https://account-id.r2.cloudflarestorage.com",
+            region="auto",
             upload_max_size_bytes=10 * 1024 * 1024,
             presign_upload_expires=600,
             presign_download_expires=3600,
@@ -66,6 +68,50 @@ class TestObjectKeyPattern:
         ]
         for key in invalid_keys:
             assert not is_valid_object_key(key), f"Should be invalid: {key}"
+
+
+class TestGetStorageService:
+    """Tests for Cloudflare R2 configuration validation."""
+
+    def test_requires_every_credential(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(storage_module, "_storage_service", None)
+        monkeypatch.setattr(storage_module.settings, "r2_access_key_id", "access")
+        monkeypatch.setattr(storage_module.settings, "r2_secret_access_key", "")
+        monkeypatch.setattr(storage_module.settings, "r2_bucket_name", "bucket")
+        monkeypatch.setattr(
+            storage_module.settings,
+            "r2_endpoint_url",
+            "https://account-id.r2.cloudflarestorage.com",
+        )
+
+        with pytest.raises(RuntimeError, match="R2_SECRET_ACCESS_KEY"):
+            get_storage_service()
+
+    def test_builds_client_from_r2_settings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(storage_module, "_storage_service", None)
+        monkeypatch.setattr(storage_module.settings, "r2_access_key_id", "access")
+        monkeypatch.setattr(storage_module.settings, "r2_secret_access_key", "secret")
+        monkeypatch.setattr(storage_module.settings, "r2_bucket_name", "bucket")
+        monkeypatch.setattr(
+            storage_module.settings,
+            "r2_endpoint_url",
+            "https://account-id.r2.cloudflarestorage.com/",
+        )
+        monkeypatch.setattr(storage_module.settings, "r2_region", "auto")
+
+        with patch("services.storage.service.boto3.client") as mock_client_factory:
+            service = get_storage_service()
+
+        assert isinstance(service, StorageService)
+        call_kwargs = mock_client_factory.call_args.kwargs
+        assert call_kwargs["endpoint_url"] == (
+            "https://account-id.r2.cloudflarestorage.com"
+        )
+        assert call_kwargs["region_name"] == "auto"
+        assert call_kwargs["aws_access_key_id"] == "access"
+        assert call_kwargs["aws_secret_access_key"] == "secret"
 
 
 class TestGeneratePresignedPutUrl:
@@ -214,7 +260,7 @@ class TestReplaceObjectKeysWithUrls:
 
         mock_storage = MagicMock()
         mock_storage.generate_presigned_get_url.return_value = (
-            "https://storage.yandexcloud.net/signed-get"
+            "https://account-id.r2.cloudflarestorage.com/signed-get"
         )
 
         input_data = {
@@ -231,7 +277,9 @@ class TestReplaceObjectKeysWithUrls:
             result = _replace_object_keys_with_urls(input_data)
 
         assert result["prompt"] == "test"
-        assert result["image_input"] == ["https://storage.yandexcloud.net/signed-get"]
+        assert result["image_input"] == [
+            "https://account-id.r2.cloudflarestorage.com/signed-get"
+        ]
         mock_storage.generate_presigned_get_url.assert_called_once_with(
             "uploads/1/550e8400-e29b-41d4-a716-446655440000.jpg"
         )

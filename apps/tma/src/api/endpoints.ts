@@ -127,7 +127,7 @@ export function getPaymentStatus(
 // =============================================================================
 
 /**
- * Get a presigned PUT URL for uploading a file to S3
+ * Get a presigned PUT URL for uploading a file to Cloudflare R2
  * POST /api/storage/presign-upload
  */
 export function presignUpload(

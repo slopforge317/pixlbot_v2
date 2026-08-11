@@ -1,4 +1,4 @@
-"""S3-compatible storage service for presigned URL generation."""
+"""Cloudflare R2 storage service for presigned URL generation."""
 
 import re
 from uuid import uuid4
@@ -21,7 +21,7 @@ OBJECT_KEY_PATTERN = re.compile(rf"^uploads/\d+/{_UUID_HEX}\.(jpg|png|webp)$")
 
 
 class StorageService:
-    """Service for generating presigned S3 URLs."""
+    """Service for generating presigned Cloudflare R2 URLs."""
 
     def __init__(
         self,
@@ -102,7 +102,7 @@ class StorageService:
         """Generate a presigned GET URL for downloading an object.
 
         Args:
-            object_key: S3 object key
+            object_key: R2 object key
 
         Returns:
             Presigned GET URL
@@ -129,7 +129,7 @@ def is_valid_object_key(object_key: str) -> bool:
     """Check if an object key matches the expected pattern.
 
     Args:
-        object_key: S3 object key to validate
+        object_key: R2 object key to validate
 
     Returns:
         True if valid, False otherwise
@@ -148,31 +148,38 @@ def get_storage_service() -> StorageService:
         StorageService instance
 
     Raises:
-        RuntimeError: If S3 is not configured
+        RuntimeError: If Cloudflare R2 is not configured
     """
     global _storage_service
     if _storage_service is not None:
         return _storage_service
 
-    if not settings.s3_access_key_id or not settings.s3_bucket_name:
+    required_settings = {
+        "R2_ACCESS_KEY_ID": settings.r2_access_key_id,
+        "R2_SECRET_ACCESS_KEY": settings.r2_secret_access_key,
+        "R2_BUCKET_NAME": settings.r2_bucket_name,
+        "R2_ENDPOINT_URL": settings.r2_endpoint_url,
+    }
+    missing_settings = [name for name, value in required_settings.items() if not value]
+    if missing_settings:
         raise RuntimeError(
-            "S3 storage is not configured. "
-            "Set S3_ACCESS_KEY_ID and S3_BUCKET_NAME in .env"
+            "Cloudflare R2 storage is not configured. Missing: "
+            + ", ".join(missing_settings)
         )
 
     _storage_service = StorageService(
-        access_key_id=settings.s3_access_key_id,
-        secret_access_key=settings.s3_secret_access_key,
-        bucket_name=settings.s3_bucket_name,
-        endpoint_url=settings.s3_endpoint_url,
-        region=settings.s3_region,
-        upload_max_size_bytes=settings.s3_upload_max_size_bytes,
-        presign_upload_expires=settings.s3_presign_upload_expires,
-        presign_download_expires=settings.s3_presign_download_expires,
+        access_key_id=settings.r2_access_key_id,
+        secret_access_key=settings.r2_secret_access_key,
+        bucket_name=settings.r2_bucket_name,
+        endpoint_url=settings.r2_endpoint_url.rstrip("/"),
+        region=settings.r2_region,
+        upload_max_size_bytes=settings.r2_upload_max_size_bytes,
+        presign_upload_expires=settings.r2_presign_upload_expires,
+        presign_download_expires=settings.r2_presign_download_expires,
     )
 
     logger.info(
-        f"StorageService initialized: bucket={settings.s3_bucket_name}, "
-        f"endpoint={settings.s3_endpoint_url}"
+        f"StorageService initialized: bucket={settings.r2_bucket_name}, "
+        f"endpoint={settings.r2_endpoint_url}"
     )
     return _storage_service
