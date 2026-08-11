@@ -1,4 +1,11 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from "react"
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { BorderBeam } from "border-beam"
 
 import { api, type FieldOptionValue, type Provider } from "@/api"
@@ -27,7 +34,6 @@ import {
   buildParameterValues,
   encodeOptionValue,
   findPricingVariant,
-  getMinProviderPrice,
   getModelParameterFields,
   getReferenceField,
   getSelectableOptions,
@@ -38,6 +44,7 @@ import {
 const promptPlaceholder =
   "Портрет в мягком студийном свете, чистый фон, естественная кожа, высокая детализация"
 const promptPreviewLimit = 155
+const allowedReferenceTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 
 type ScreenId = "generation" | "history" | "payment"
 type HistoryStatus = "Готово" | "В работе" | "Ошибка"
@@ -47,8 +54,23 @@ type ReferenceImage = {
 }
 type ModelsLoadStatus = "idle" | "loading" | "success" | "error"
 
-function formatModelPrice(price: number | null) {
-  return price === null ? "Цена не задана" : `от ${price} credits`
+function formatCreditPrice(price: number | null) {
+  if (price === null) {
+    return "Цена не задана"
+  }
+
+  const lastTwoDigits = price % 100
+  const lastDigit = price % 10
+  const unit =
+    lastTwoDigits >= 11 && lastTwoDigits <= 14
+      ? "кредитов"
+      : lastDigit === 1
+        ? "кредит"
+        : lastDigit >= 2 && lastDigit <= 4
+          ? "кредита"
+          : "кредитов"
+
+  return `${price} ${unit}`
 }
 
 function getModelsErrorMessage(error: unknown) {
@@ -136,7 +158,8 @@ export function PrototypePage() {
   const [modelsError, setModelsError] = useState("")
   const [selectedProvider, setSelectedProvider] = useState("")
   const [prompt, setPrompt] = useState("")
-  const [referenceImage, setReferenceImage] = useState<ReferenceImage | null>(null)
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([])
+  const referenceImagesRef = useRef<ReferenceImage[]>([])
   const [referenceError, setReferenceError] = useState("")
   const [parameterValues, setParameterValues] = useState<Record<string, unknown>>({})
   const [status, setStatus] = useState<"idle" | "queued">("idle")
@@ -153,8 +176,8 @@ export function PrototypePage() {
   )
 
   const currentModel = useMemo(
-    () => selectModelForReference(currentProvider, Boolean(referenceImage)),
-    [currentProvider, referenceImage],
+    () => selectModelForReference(currentProvider, referenceImages.length > 0),
+    [currentProvider, referenceImages.length],
   )
 
   const parameterFields = useMemo(
@@ -175,10 +198,7 @@ export function PrototypePage() {
     typeof promptSchema?.max_length === "number" ? promptSchema.max_length : 2000
 
   const referenceMaxSizeMb = referenceField?.schema.max_image_size_mb ?? 10
-
-  const modelPrice = currentProvider
-    ? currentPrice ?? getMinProviderPrice(currentProvider)
-    : null
+  const referenceMaxImages = referenceField?.schema.max_images ?? 1
 
   const loadModels = useCallback(async () => {
     setModelsLoadStatus("loading")
@@ -220,30 +240,91 @@ export function PrototypePage() {
   }, [parameterFields])
 
   useEffect(() => {
-    return () => {
-      if (referenceImage) {
-        URL.revokeObjectURL(referenceImage.url)
+    setPrompt((current) => current.slice(0, promptMaxLength))
+  }, [promptMaxLength])
+
+  useEffect(() => {
+    setReferenceImages((current) => {
+      if (current.length <= referenceMaxImages) {
+        return current
       }
+
+      current
+        .slice(referenceMaxImages)
+        .forEach((image) => URL.revokeObjectURL(image.url))
+      return current.slice(0, referenceMaxImages)
+    })
+  }, [referenceMaxImages])
+
+  useEffect(() => {
+    referenceImagesRef.current = referenceImages
+  }, [referenceImages])
+
+  useEffect(() => {
+    return () => {
+      referenceImagesRef.current.forEach((image) => URL.revokeObjectURL(image.url))
     }
-  }, [referenceImage])
+  }, [])
 
   function handleReferenceChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
+    const files = Array.from(event.target.files ?? [])
 
-    if (!file) {
+    if (files.length === 0) {
       return
     }
 
-    if (file.size > referenceMaxSizeMb * 1024 * 1024) {
+    const unsupportedFile = files.find(
+      (file) => !allowedReferenceTypes.has(file.type),
+    )
+    if (unsupportedFile) {
+      setReferenceError("Поддерживаются только JPG, PNG и WEBP")
+      return
+    }
+
+    const oversizedFile = files.find(
+      (file) => file.size > referenceMaxSizeMb * 1024 * 1024,
+    )
+    if (oversizedFile) {
       setReferenceError(`Файл больше ${referenceMaxSizeMb} MB`)
       return
     }
 
-    setReferenceError("")
-    setReferenceImage({
+    const acceptedFiles = referenceMaxImages === 1 ? files.slice(0, 1) : files
+    const nextImages = acceptedFiles.map((file) => ({
       name: file.name,
       url: URL.createObjectURL(file),
+    }))
+
+    if (
+      referenceMaxImages > 1 &&
+      referenceImages.length + nextImages.length > referenceMaxImages
+    ) {
+      nextImages.forEach((image) => URL.revokeObjectURL(image.url))
+      setReferenceError(`Можно загрузить не больше ${referenceMaxImages} фото`)
+      return
+    }
+
+    setReferenceError("")
+    setReferenceImages((current) => {
+      if (referenceMaxImages === 1) {
+        current.forEach((image) => URL.revokeObjectURL(image.url))
+        return nextImages
+      }
+
+      return [...current, ...nextImages]
     })
+    setStatus("idle")
+  }
+
+  function removeReferenceImage(url: string) {
+    setReferenceImages((current) => {
+      const removed = current.find((image) => image.url === url)
+      if (removed) {
+        URL.revokeObjectURL(removed.url)
+      }
+      return current.filter((image) => image.url !== url)
+    })
+    setReferenceError("")
     setStatus("idle")
   }
 
@@ -251,6 +332,7 @@ export function PrototypePage() {
     <main
       className="h-svh bg-background text-foreground"
       data-active-api-model={currentModel?.api_model_id}
+      data-current-price={currentPrice ?? undefined}
       data-selected-provider={currentProvider?.slug}
     >
       <Tabs
@@ -281,7 +363,7 @@ export function PrototypePage() {
                   Выберите модель
                 </label>
                 <span className="font-technical text-caption text-muted-foreground">
-                  {currentProvider ? formatModelPrice(modelPrice) : "Модели"}
+                  {currentProvider ? formatCreditPrice(currentPrice) : "Модели"}
                 </span>
               </div>
               <Select
@@ -313,11 +395,6 @@ export function PrototypePage() {
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              {currentModel?.status ? (
-                <Badge className="justify-self-start" variant="blue">
-                  {currentModel.status}
-                </Badge>
-              ) : null}
               {modelsLoadStatus === "error" ? (
                 <div className="grid gap-8">
                   <p className="text-caption text-red-600">{modelsError}</p>
@@ -361,34 +438,54 @@ export function PrototypePage() {
               </div>
               <Attachment
                 className="grid min-h-112 w-full cursor-pointer place-items-center rounded-input bg-background p-16 text-center hover:bg-muted"
-                state={referenceImage ? "done" : "idle"}
+                state={referenceImages.length > 0 ? "done" : "idle"}
               >
                 <AttachmentTrigger asChild>
                   <input
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     className="absolute inset-0 z-10 cursor-pointer opacity-0"
                     disabled={!referenceField}
-                    key={referenceImage?.url ?? "empty-reference"}
+                    key={referenceImages.map((image) => image.url).join("|") || "empty"}
+                    multiple={referenceMaxImages > 1}
                     onChange={handleReferenceChange}
                     type="file"
                   />
                 </AttachmentTrigger>
-                {referenceImage ? (
-                  <div className="grid w-full grid-cols-[72px_1fr] items-center gap-12 text-left">
-                    <AttachmentMedia
-                      className="h-72 w-72 rounded-input"
-                      variant="image"
-                    >
-                      <img alt="" src={referenceImage.url} />
-                    </AttachmentMedia>
-                    <AttachmentContent className="grid gap-4 leading-normal">
-                      <AttachmentTitle className="text-body-sm">
-                        {referenceImage.name}
-                      </AttachmentTitle>
-                      <AttachmentDescription className="mt-0 text-caption">
-                        Изображение прикреплено
-                      </AttachmentDescription>
-                    </AttachmentContent>
+                {referenceImages.length > 0 ? (
+                  <div className="grid w-full gap-8 text-left">
+                    {referenceImages.map((image) => (
+                      <div
+                        className="grid grid-cols-[56px_1fr_auto] items-center gap-10"
+                        key={image.url}
+                      >
+                        <AttachmentMedia
+                          className="h-56 w-56 rounded-input"
+                          variant="image"
+                        >
+                          <img alt="" src={image.url} />
+                        </AttachmentMedia>
+                        <AttachmentContent className="min-w-0 leading-normal">
+                          <AttachmentTitle className="truncate text-body-sm">
+                            {image.name}
+                          </AttachmentTitle>
+                          <AttachmentDescription className="mt-0 text-caption">
+                            {referenceImages.length} из {referenceMaxImages}
+                          </AttachmentDescription>
+                        </AttachmentContent>
+                        <button
+                          aria-label={`Удалить ${image.name}`}
+                          className="relative z-20 rounded-button border border-border px-8 py-4 text-caption font-medium hover:bg-muted"
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            removeReferenceImage(image.url)
+                          }}
+                          type="button"
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <AttachmentContent className="grid place-items-center gap-6 leading-normal">
@@ -397,24 +494,12 @@ export function PrototypePage() {
                     </AttachmentTitle>
                     <AttachmentDescription className="mt-0 text-caption">
                       {referenceField
-                        ? `JPG, PNG или WEBP до ${referenceMaxSizeMb} MB`
+                        ? `JPG, PNG или WEBP. До ${referenceMaxImages} фото, каждое до ${referenceMaxSizeMb} MB`
                         : "Эта модель не поддерживает референс"}
                     </AttachmentDescription>
                   </AttachmentContent>
                 )}
               </Attachment>
-              {referenceImage ? (
-                <button
-                  className="justify-self-start rounded-button border border-border px-12 py-6 text-caption font-medium hover:bg-muted"
-                  onClick={() => {
-                    setReferenceImage(null)
-                    setReferenceError("")
-                  }}
-                  type="button"
-                >
-                  Удалить референс
-                </button>
-              ) : null}
               {referenceError ? (
                 <p className="text-caption text-red-600">{referenceError}</p>
               ) : null}

@@ -33,6 +33,7 @@ TELEGRAM_TEST_MODE=false
 WEBHOOK_ENABLED=false
 FUNNEL_ENABLED=false
 PAYMENT_CLEANUP_ENABLED=false
+S3_UPLOAD_MAX_SIZE_BYTES=31457280
 ```
 
 Для `POSTGRES_PASSWORD` используйте длинное значение только из латинских букв и

@@ -146,13 +146,6 @@ export function findPricingVariant(
   )
 }
 
-export function getMinProviderPrice(provider: Provider) {
-  const prices = provider.models.flatMap((model) =>
-    model.pricing.map((variant) => variant.price),
-  )
-  return prices.length > 0 ? Math.min(...prices) : null
-}
-
 export function encodeOptionValue(value: FieldOptionValue) {
   return `${typeof value}:${String(value)}`
 }

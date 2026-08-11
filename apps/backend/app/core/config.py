@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     s3_bucket_name: str = ""
     s3_endpoint_url: str = "https://storage.yandexcloud.net"
     s3_region: str = "ru-central1"
-    s3_upload_max_size_bytes: int = 10 * 1024 * 1024  # 10 MB
+    s3_upload_max_size_bytes: int = 30 * 1024 * 1024  # 30 MB catalog maximum
     s3_presign_upload_expires: int = 600  # 10 min for PUT
     s3_presign_download_expires: int = 3600  # 1 hour for GET
 
