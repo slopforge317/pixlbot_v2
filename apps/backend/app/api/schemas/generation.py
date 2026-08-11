@@ -36,8 +36,8 @@ class GenerationCreateRequest(BaseModel):
         prompt = v.get("prompt")
         if not prompt or not isinstance(prompt, str) or len(prompt.strip()) == 0:
             raise ValueError("prompt is required in input")
-        if len(prompt) > 2000:
-            raise ValueError("prompt must be at most 2000 characters")
+        if len(prompt) > 20000:
+            raise ValueError("prompt must be at most 20000 characters")
         return v
 
 

@@ -9,6 +9,7 @@ from api.schemas.generation import (
     SendOriginalResponse,
 )
 from db.enums import JobStatus
+from db.models.ai_model import AIModel
 from db.repositories.generation import GenerationJobRepository
 from db.repositories.pricing_variant import PricingVariantRepository
 from db.repositories.transaction import TransactionRepository
@@ -18,6 +19,54 @@ from loguru import logger
 from services.generation import process_generation
 
 router = APIRouter(prefix="/api", tags=["generations"])
+
+
+def _validate_input_against_model(
+    input_data: dict[str, object], model: AIModel
+) -> None:
+    """Validate prompt and reference limits from model input_schema."""
+    prompt_spec = model.input_schema.get("prompt", {})
+    prompt = input_data.get("prompt")
+    max_length = prompt_spec.get("max_length")
+    if (
+        isinstance(prompt, str)
+        and isinstance(max_length, int)
+        and not isinstance(max_length, bool)
+        and len(prompt) > max_length
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Prompt must be at most {max_length} characters",
+        )
+
+    for field_name, field_spec in model.input_schema.items():
+        if field_spec.get("type") != "array":
+            continue
+
+        value = input_data.get(field_name)
+        if field_spec.get("required") and (not isinstance(value, list) or not value):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field_name} requires at least one image",
+            )
+        if value is None:
+            continue
+        if not isinstance(value, list):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field_name} must be an array",
+            )
+
+        max_images = field_spec.get("max_images")
+        if (
+            isinstance(max_images, int)
+            and not isinstance(max_images, bool)
+            and len(value) > max_images
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field_name} accepts at most {max_images} images",
+            )
 
 
 @router.post("/generations", response_model=GenerationResponse, status_code=201)
@@ -40,7 +89,7 @@ async def create_generation(
 
     # 1. Validate pricing variant exists and is active
     pv_repo = PricingVariantRepository(session)
-    variant = await pv_repo.get_by_id(request.variant.id)
+    variant = await pv_repo.get_by_id_with_model(request.variant.id)
 
     if not variant or not variant.active:
         logger.warning(
@@ -50,6 +99,19 @@ async def create_generation(
         raise HTTPException(
             status_code=404, detail="Pricing variant not found or inactive"
         )
+
+    model = variant.model
+    provider = model.provider if model else None
+    if not model or not model.active or not provider or not provider.active:
+        raise HTTPException(status_code=404, detail="Model not found or inactive")
+
+    if request.model.id != model.id or request.model.api_model_id != model.api_model_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Selected model does not match pricing variant",
+        )
+
+    _validate_input_against_model(request.input, model)
 
     # 2. Price check (stale data protection)
     if request.variant.price != variant.price:
