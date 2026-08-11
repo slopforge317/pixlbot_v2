@@ -1,6 +1,6 @@
 slug: gpt-image-2
 title: GPT Image 2
-sort_order: 60
+sort_order: 10
 implementations:
 - api_model_id: gpt-image-2-text-to-image
   title: Text-to-Image

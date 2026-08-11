@@ -1,6 +1,6 @@
 slug: seedream-5-lite
 title: Seedream 5 Lite
-sort_order: 30
+sort_order: 40
 implementations:
 - api_model_id: seedream/5-lite-text-to-image
   title: Text-to-Image
