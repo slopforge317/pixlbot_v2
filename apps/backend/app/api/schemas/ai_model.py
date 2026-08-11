@@ -23,6 +23,8 @@ class AIModelResponse(BaseModel):
     id: int
     api_model_id: str
     title: str
+    input_mode: str
+    sort_order: int
     input_schema: dict[str, Any]
     variant_keys: list[str]
     pricing: list[PricingVariantResponse]
@@ -35,8 +37,10 @@ class ProviderResponse(BaseModel):
     """Provider with its models."""
 
     id: int
+    slug: str
     title: str
     gen_type: str
+    sort_order: int
     models: list[AIModelResponse]
 
     model_config = {"from_attributes": True}

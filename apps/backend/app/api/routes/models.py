@@ -32,6 +32,8 @@ def _provider_to_response(provider: Provider) -> ProviderResponse:
                 id=model.id,
                 api_model_id=model.api_model_id,
                 title=model.title,
+                input_mode=model.input_mode,
+                sort_order=model.sort_order,
                 input_schema=model.input_schema,
                 variant_keys=model.variant_keys,
                 pricing=pricing,
@@ -40,8 +42,10 @@ def _provider_to_response(provider: Provider) -> ProviderResponse:
         )
     return ProviderResponse(
         id=provider.id,
+        slug=provider.slug,
         title=provider.title,
         gen_type=provider.gen_type,
+        sort_order=provider.sort_order,
         models=models,
     )
 

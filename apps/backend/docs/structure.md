@@ -168,9 +168,11 @@ app/
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | **id** | Integer | PK | Provider ID |
+| `slug` | String(100) | Unique | Stable catalog key (e.g., "gpt-image-1-5") |
 | `title` | String(200) | Unique | Provider display name (e.g., "Sora 2 Pro") |
 | `gen_type` | String(20) | Yes | Generation type: "image" or "video" |
 | `active` | Boolean | Yes | Whether provider is shown to users (default: true) |
+| `sort_order` | Integer | Yes | Catalog display order |
 
 #### `ai_models`
 | Field | Type | Required | Description |
@@ -179,9 +181,11 @@ app/
 | **provider_id** | Integer | FK | Reference to providers |
 | `api_model_id` | String(255) | Unique | Model ID sent to KIE API (e.g., "sora-2-pro-text-to-video") |
 | `title` | String(200) | Yes | Display name (e.g., "Text to Video") |
+| `input_mode` | String(20) | Yes | `text_only`, `image_required`, or `image_optional` |
 | `input_schema` | JSON | Yes | Parameter schema for frontend UI |
 | `variant_keys` | JSON | Yes | Keys used for pricing variants (default: []) |
 | `active` | Boolean | Yes | Whether model is available (default: true) |
+| `sort_order` | Integer | Yes | Order inside provider |
 
 #### `pricing_variants`
 | Field | Type | Required | Description |

@@ -10,6 +10,8 @@ f7d735a7befd  legacy baseline
       ↓
 20260805_0001  native PostgreSQL enums → VARCHAR
       ↓
+20260811_0001  model catalog slug/input mode
+      ↓
 будущие миграции
 ```
 
@@ -21,6 +23,10 @@ f7d735a7befd  legacy baseline
 - `funnel_steps.trigger_event` → `VARCHAR(21)`;
 - `funnel_steps.condition` → `VARCHAR(18)`;
 - `scheduled_messages.status` → `VARCHAR(9)`.
+
+`20260811_0001_add_model_catalog_fields.py` добавляет стабильные slug каталогов,
+режим входных данных внутренних моделей и деактивирует video providers/models.
+Видео-строки сохраняются для существующей истории генераций.
 
 ## Восстановленная база
 

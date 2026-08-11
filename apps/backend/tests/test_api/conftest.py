@@ -204,6 +204,7 @@ async def seed_models(
 
     # Create image provider
     image_provider = Provider(
+        slug="test-image-provider",
         title="Test Image Provider",
         gen_type="image",
         active=True,
@@ -249,6 +250,7 @@ async def seed_models(
 
     # Create video provider
     video_provider = Provider(
+        slug="test-video-provider",
         title="Test Video Provider",
         gen_type="video",
         active=True,

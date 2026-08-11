@@ -55,6 +55,8 @@ export interface AIModel {
   id: number;
   api_model_id: string;
   title: string;
+  input_mode: "text_only" | "image_required" | "image_optional";
+  sort_order: number;
   input_schema: Record<string, FieldSchema>;
   variant_keys: string[];
   pricing: PricingVariant[];
@@ -63,8 +65,10 @@ export interface AIModel {
 
 export interface Provider {
   id: number;
+  slug: string;
   title: string;
   gen_type: "image" | "video";
+  sort_order: number;
   models: AIModel[];
 }
 

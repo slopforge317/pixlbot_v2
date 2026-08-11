@@ -190,13 +190,17 @@ Authorization: tma <initData>
   "providers": [
     {
       "id": 1,
-      "title": "Seedream",
+      "slug": "seedream-4-5",
+      "title": "Seedream 4.5",
       "gen_type": "image",
+      "sort_order": 40,
       "models": [
         {
           "id": 10,
           "api_model_id": "seedream/4.5-text-to-image",
-          "title": "Seedream 4.5 Text to Image",
+          "title": "Text-to-Image",
+          "input_mode": "text_only",
+          "sort_order": 10,
           "input_schema": {
             "prompt": {
               "type": "string",
@@ -236,6 +240,11 @@ Authorization: tma <initData>
 ### Frontend notes
 
 `input_schema` управляет формой:
+
+`providers.title` — публичное название модели, `providers.slug` — стабильный
+технический ключ. `input_mode` определяет совместимость внутренней реализации:
+`text_only`, `image_required` или `image_optional`. Providers и вложенные модели
+возвращаются по `sort_order`, затем по `id`.
 
 | Field property | Meaning |
 | --- | --- |

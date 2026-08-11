@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 from db.base import Base
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, CheckConstraint, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -13,6 +13,12 @@ class AIModel(Base):
     """AI model within a provider (e.g. seedream/4.5-text-to-image)."""
 
     __tablename__ = "ai_models"
+    __table_args__ = (
+        CheckConstraint(
+            "input_mode IN ('text_only', 'image_required', 'image_optional')",
+            name="ck_ai_models_input_mode",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     provider_id: Mapped[int] = mapped_column(
@@ -20,6 +26,9 @@ class AIModel(Base):
     )
     api_model_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    input_mode: Mapped[str] = mapped_column(
+        String(20), default="text_only", nullable=False, server_default="text_only"
+    )
     input_schema: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     variant_keys: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

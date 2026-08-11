@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 # Add app to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
@@ -24,6 +24,8 @@ from db.models.ai_model import AIModel  # noqa: E402
 from db.models.pricing_variant import PricingVariant  # noqa: E402
 from db.models.provider import Provider  # noqa: E402
 from db.session import async_session_maker, engine  # noqa: E402
+
+VALID_INPUT_MODES = {"text_only", "image_required", "image_optional"}
 
 
 def load_api_parameters() -> list[dict[str, Any]]:
@@ -72,25 +74,89 @@ def extract_variant_keys(parameters: dict[str, Any]) -> list[str]:
     return variant_keys
 
 
+def validate_catalog(
+    api_params: list[dict[str, Any]],
+    prices: dict[str, list[dict[str, Any]]],
+) -> None:
+    """Validate catalog identities, availability, and pricing dimensions."""
+    providers: dict[str, tuple[str, str]] = {}
+    api_model_ids: set[str] = set()
+
+    for entry in api_params:
+        slug = entry["slug"]
+        title = entry["provider"]
+        gen_type = entry["gen_type"]
+        active = entry.get("active", gen_type == "image")
+        provider_identity = (title, gen_type)
+
+        existing_identity = providers.setdefault(slug, provider_identity)
+        if existing_identity != provider_identity:
+            raise ValueError(f"Provider slug {slug!r} has conflicting metadata")
+
+        if gen_type != "image" and active:
+            raise ValueError(f"Video provider {slug!r} must not be active")
+
+        input_mode = entry["model"]["input_mode"]
+        if input_mode not in VALID_INPUT_MODES:
+            raise ValueError(f"Invalid input_mode {input_mode!r} for {slug!r}")
+
+        variant_keys = set(extract_variant_keys(entry["input"]["parameters"]))
+        for api_model_id in entry["model"]["values"]:
+            if api_model_id in api_model_ids:
+                raise ValueError(f"Duplicate api_model_id {api_model_id!r}")
+            api_model_ids.add(api_model_id)
+
+            if not active:
+                continue
+
+            model_prices = prices.get(api_model_id, [])
+            if not model_prices:
+                raise ValueError(f"No pricing found for active model {api_model_id!r}")
+
+            for price in model_prices:
+                price_keys = set(price["variant_values"])
+                if price_keys != variant_keys:
+                    raise ValueError(
+                        f"Pricing keys for {api_model_id!r} are {sorted(price_keys)}, "
+                        f"expected {sorted(variant_keys)}"
+                    )
+
+
 async def upsert_provider(
-    session: Any, title: str, gen_type: str, sort_order: int = 0
+    session: Any,
+    slug: str,
+    title: str,
+    gen_type: str,
+    sort_order: int = 0,
+    active: bool = True,
 ) -> Provider:
-    """Get existing provider by title or create a new one."""
-    result = await session.execute(select(Provider).where(Provider.title == title))
+    """Get existing provider by stable slug or create a new one."""
+    result = await session.execute(select(Provider).where(Provider.slug == slug))
     provider = result.scalar_one_or_none()
 
     if provider:
+        provider.title = title
         provider.gen_type = gen_type
-        provider.active = True
+        provider.active = active
         provider.sort_order = sort_order
-        print(f"Updated provider: {title} ({gen_type}, sort_order={sort_order})")
+        print(
+            f"Updated provider: {slug} ({title}, {gen_type}, "
+            f"active={active}, sort_order={sort_order})"
+        )
     else:
         provider = Provider(
-            title=title, gen_type=gen_type, active=True, sort_order=sort_order
+            slug=slug,
+            title=title,
+            gen_type=gen_type,
+            active=active,
+            sort_order=sort_order,
         )
         session.add(provider)
         await session.flush()
-        print(f"Created provider: {title} ({gen_type}, sort_order={sort_order})")
+        print(
+            f"Created provider: {slug} ({title}, {gen_type}, "
+            f"active={active}, sort_order={sort_order})"
+        )
 
     return provider
 
@@ -100,10 +166,12 @@ async def upsert_model(
     provider_id: int,
     api_model_id: str,
     title: str,
+    input_mode: str,
     input_schema: dict[str, Any],
     variant_keys: list[str],
     sort_order: int = 0,
     status: str | None = None,
+    active: bool = True,
 ) -> AIModel:
     """Get existing model by api_model_id or create a new one."""
     result = await session.execute(
@@ -114,9 +182,10 @@ async def upsert_model(
     if model:
         model.provider_id = provider_id
         model.title = title
+        model.input_mode = input_mode
         model.input_schema = input_schema
         model.variant_keys = variant_keys
-        model.active = True
+        model.active = active
         model.sort_order = sort_order
         model.status = status
         print(f"  Updated model: {api_model_id} ({title}, sort_order={sort_order})")
@@ -125,9 +194,10 @@ async def upsert_model(
             provider_id=provider_id,
             api_model_id=api_model_id,
             title=title,
+            input_mode=input_mode,
             input_schema=input_schema,
             variant_keys=variant_keys,
-            active=True,
+            active=active,
             sort_order=sort_order,
             status=status,
         )
@@ -196,30 +266,38 @@ async def seed_data(
 ) -> None:
     """Seed providers, models, and pricing variants using upsert logic."""
     async with async_session_maker() as session:
-        # Track providers by title to deduplicate within YAML
+        # Track providers by slug to deduplicate within YAML
         provider_cache: dict[str, Provider] = {}
 
         # Track model sort_order per provider
         provider_model_counter: dict[str, int] = {}
 
         for entry in api_params:
+            provider_slug = entry["slug"]
             provider_title = entry["provider"]
             gen_type = entry["gen_type"]
             model_values = entry["model"]["values"]
             model_ui_label = entry["model"]["ui_label"]
+            input_mode = entry["model"]["input_mode"]
             input_params = entry["input"]["parameters"]
             provider_sort_order = entry.get("sort_order", 0)
             model_sort_order = entry["model"].get("sort_order", 0)
             status = entry.get("status")
+            active = entry.get("active", gen_type == "image")
 
             # Upsert provider
-            if provider_title not in provider_cache:
+            if provider_slug not in provider_cache:
                 provider = await upsert_provider(
-                    session, provider_title, gen_type, provider_sort_order
+                    session,
+                    provider_slug,
+                    provider_title,
+                    gen_type,
+                    provider_sort_order,
+                    active,
                 )
-                provider_cache[provider_title] = provider
+                provider_cache[provider_slug] = provider
             else:
-                provider = provider_cache[provider_title]
+                provider = provider_cache[provider_slug]
 
             # Compute model sort_order: use explicit value or fallback to counter
             if model_sort_order == 0:
@@ -241,10 +319,12 @@ async def seed_data(
                     provider_id=provider.id,
                     api_model_id=api_model_id,
                     title=model_ui_label,
+                    input_mode=input_mode,
                     input_schema=input_schema,
                     variant_keys=variant_keys,
                     sort_order=effective_model_sort_order,
                     status=status,
+                    active=active,
                 )
 
                 # Upsert pricing variants
@@ -254,6 +334,20 @@ async def seed_data(
                     continue
 
                 await upsert_pricing_variants(session, model.id, model_prices)
+
+        # Video catalog stays in DB for history but is never available to users.
+        await session.execute(
+            update(Provider).where(Provider.gen_type != "image").values(active=False)
+        )
+        await session.execute(
+            update(AIModel)
+            .where(
+                AIModel.provider_id.in_(
+                    select(Provider.id).where(Provider.gen_type != "image")
+                )
+            )
+            .values(active=False)
+        )
 
         await session.commit()
         print("\nSeed completed successfully!")
@@ -270,6 +364,9 @@ async def main() -> None:
 
     print("Loading seed prices...")
     prices = load_seed_prices()
+
+    print("Validating model catalog...")
+    validate_catalog(api_params, prices)
 
     print("Seeding providers, models, and pricing variants...")
     await seed_data(api_params, prices)

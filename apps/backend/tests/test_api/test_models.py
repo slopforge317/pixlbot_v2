@@ -44,8 +44,10 @@ class TestProvidersEndpoint:
         # Check first provider structure
         provider = data["providers"][0]
         assert "id" in provider
+        assert provider["slug"] == "test-image-provider"
         assert "title" in provider
         assert "gen_type" in provider
+        assert "sort_order" in provider
         assert "models" in provider
         assert len(provider["models"]) > 0
 
@@ -54,6 +56,8 @@ class TestProvidersEndpoint:
         assert "id" in model
         assert "api_model_id" in model
         assert "title" in model
+        assert model["input_mode"] == "text_only"
+        assert "sort_order" in model
         assert "input_schema" in model
         assert "variant_keys" in model
         assert "pricing" in model
