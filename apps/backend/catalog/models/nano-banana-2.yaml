@@ -1,0 +1,69 @@
+slug: nano-banana-2
+title: Nano Banana 2
+sort_order: 10
+implementations:
+- api_model_id: nano-banana-2
+  title: Nano Banana 2
+  input_mode: image_optional
+  sort_order: 10
+  status: Pro
+  parameters:
+    prompt:
+      type: string
+      required: true
+      max_length: 20000
+      ui_label: Запрос
+      ui_order: 1
+    image_input:
+      type: array
+      required: false
+      max_images: 14
+      max_image_size_mb: 30
+      ui_label: Фото для референса
+      ui_order: 2
+    aspect_ratio:
+      type: string
+      required: false
+      values:
+      - '1:1'
+      - '2:3'
+      - '3:2'
+      - '3:4'
+      - '4:3'
+      - '4:5'
+      - '5:4'
+      - '9:16'
+      - '16:9'
+      - '21:9'
+      - auto
+      default: auto
+      ui_label: Соотношение сторон
+      ui_order: 3
+    resolution:
+      type: string
+      required: false
+      values:
+      - 2K
+      - 4K
+      variant: false
+      default: 2K
+      ui_label: Разрешение
+      ui_order: 4
+    output_format:
+      type: string
+      required: false
+      values:
+      - png
+      - jpg
+      default: png
+      ui_label: Формат файла
+      ui_order: 5
+    google_search:
+      type: boolean
+      required: true
+      variant: false
+      default: false
+      ui_label: Использовать Google поиск для генерации
+      ui_order: 6
+  pricing:
+  - price: 5

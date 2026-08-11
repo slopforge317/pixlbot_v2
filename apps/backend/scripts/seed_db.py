@@ -11,12 +11,23 @@ Usage:
 import asyncio
 import json
 import sys
-from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import yaml
 from sqlalchemy import select, update
+
+try:
+    from scripts.model_catalog import (
+        extract_variant_keys,
+        load_seed_data,
+        normalize_input_schema,
+    )
+except ModuleNotFoundError:  # Direct execution: python scripts/seed_db.py
+    from model_catalog import (  # type: ignore[no-redef]
+        extract_variant_keys,
+        load_seed_data,
+        normalize_input_schema,
+    )
 
 # Add app to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
@@ -30,86 +41,15 @@ VALID_INPUT_MODES = {"text_only", "image_required", "image_optional"}
 
 
 def load_api_parameters() -> list[dict[str, Any]]:
-    """Load API parameters from YAML file."""
-    yaml_file = Path(__file__).parent / "api_parameters.yaml"
-    if not yaml_file.exists():
-        raise FileNotFoundError(f"API parameters file not found: {yaml_file}")
-
-    with open(yaml_file, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    return data.get("providers", [])
+    """Load API parameters from the typed model catalog."""
+    api_params, _ = load_seed_data()
+    return api_params
 
 
 def load_seed_prices() -> dict[str, list[dict[str, Any]]]:
-    """Load pricing data from YAML file (flat list grouped by product)."""
-    yaml_file = Path(__file__).parent / "seed_prices.yaml"
-    if not yaml_file.exists():
-        raise FileNotFoundError(f"Seed prices file not found: {yaml_file}")
-
-    with open(yaml_file, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    # Convert flat list to dict keyed by product (api_model_id)
-    prices: dict[str, list[dict[str, Any]]] = {}
-    for entry in data:
-        product = entry["product"]
-        if product not in prices:
-            prices[product] = []
-        prices[product].append(
-            {
-                "variant_values": entry.get("variant_values", {}),
-                "price": entry["price"],
-                "active": entry.get("active", True),
-            }
-        )
+    """Load pricing data from the typed model catalog."""
+    _, prices = load_seed_data()
     return prices
-
-
-def extract_variant_keys(parameters: dict[str, Any]) -> list[str]:
-    """Extract parameter keys with variant: true from input parameters."""
-    variant_keys: list[str] = []
-    for key, spec in parameters.items():
-        if isinstance(spec, dict) and spec.get("variant") is True:
-            variant_keys.append(key)
-    return variant_keys
-
-
-def normalize_input_schema(parameters: dict[str, Any]) -> dict[str, Any]:
-    """Build frontend schema with stable field and option ordering."""
-    normalized = deepcopy(parameters)
-
-    for spec in normalized.values():
-        if not isinstance(spec, dict):
-            continue
-
-        ui_order = spec.get("ui_order")
-        if isinstance(ui_order, int) and 0 < ui_order < 10:
-            spec["ui_order"] = ui_order * 10
-
-        values = spec.pop("values", None)
-        if not isinstance(values, list):
-            continue
-
-        options: list[dict[str, Any]] = []
-        for index, item in enumerate(values, start=1):
-            if isinstance(item, dict):
-                option = dict(item)
-                option.setdefault("label", str(option["value"]))
-                option.setdefault("sort_order", index * 10)
-            else:
-                option = {
-                    "value": item,
-                    "label": str(item),
-                    "sort_order": index * 10,
-                }
-            options.append(option)
-
-        spec["options"] = sorted(
-            options, key=lambda option: (option["sort_order"], str(option["value"]))
-        )
-
-    return normalized
 
 
 def validate_catalog(
@@ -304,6 +244,13 @@ async def seed_data(
 ) -> None:
     """Seed providers, models, and pricing variants using upsert logic."""
     async with async_session_maker() as session:
+        catalog_provider_slugs = {entry["slug"] for entry in api_params}
+        catalog_model_ids = {
+            api_model_id
+            for entry in api_params
+            for api_model_id in entry["model"]["values"]
+        }
+
         # Track providers by slug to deduplicate within YAML
         provider_cache: dict[str, Provider] = {}
 
@@ -373,7 +320,20 @@ async def seed_data(
 
                 await upsert_pricing_variants(session, model.id, model_prices)
 
-        # Video catalog stays in DB for history but is never available to users.
+        # The YAML directory is authoritative. Historical rows stay intact but
+        # anything removed from the catalog becomes unavailable.
+        await session.execute(
+            update(AIModel)
+            .where(AIModel.api_model_id.not_in(catalog_model_ids))
+            .values(active=False)
+        )
+        await session.execute(
+            update(Provider)
+            .where(Provider.slug.not_in(catalog_provider_slugs))
+            .values(active=False)
+        )
+
+        # Extra guard for legacy video rows.
         await session.execute(
             update(Provider).where(Provider.gen_type != "image").values(active=False)
         )

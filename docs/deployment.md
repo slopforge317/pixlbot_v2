@@ -150,6 +150,18 @@ docker compose \
   --env-file .env.test \
   -f compose.test.yaml \
   --profile tools \
+  run --rm seed python scripts/model_catalog.py validate
+
+docker compose \
+  --env-file .env.test \
+  -f compose.test.yaml \
+  --profile tools \
+  run --rm seed python scripts/model_catalog.py diff
+
+docker compose \
+  --env-file .env.test \
+  -f compose.test.yaml \
+  --profile tools \
   run --rm seed
 ```
 
@@ -212,7 +224,7 @@ docker compose \
 ```
 
 Ожидаются только image-модели: Nano Banana 2, Nano Banana Pro, Seedream 5 Lite,
-Seedream 4.5 и GPT Image 1.5. Sora/Kling должны отсутствовать.
+Seedream 4.5, GPT Image 1.5 и GPT Image 2. Sora/Kling должны отсутствовать.
 
 ## Остановка и восстановление
 

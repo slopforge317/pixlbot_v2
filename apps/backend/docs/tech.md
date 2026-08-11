@@ -60,7 +60,7 @@ Environment variables loaded via `pydantic-settings` from `.env` file:
 
 - **Development & Production:** PostgreSQL (async via asyncpg)
 - **Migrations:** Alembic (deferred, using `create_tables()` for now)
-- **Seeding:** `scripts/seed_db.py` loads data from `scripts/seed_data.yaml`
+- **Seeding:** `scripts/seed_db.py` loads typed YAML files from `catalog/models`
 
 ## External APIs
 

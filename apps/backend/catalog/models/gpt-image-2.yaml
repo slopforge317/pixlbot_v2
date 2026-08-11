@@ -1,0 +1,95 @@
+slug: gpt-image-2
+title: GPT Image 2
+sort_order: 60
+implementations:
+- api_model_id: gpt-image-2-text-to-image
+  title: Text-to-Image
+  input_mode: text_only
+  sort_order: 10
+  parameters:
+    prompt:
+      type: string
+      required: true
+      max_length: 20000
+      ui_label: Запрос
+      ui_order: 1
+    aspect_ratio:
+      type: string
+      required: false
+      values: &supported_aspect_ratios
+      - auto
+      - '1:1'
+      - '3:2'
+      - '2:3'
+      - '4:3'
+      - '3:4'
+      - '16:9'
+      - '9:16'
+      - '2:1'
+      - '1:2'
+      - '21:9'
+      default: auto
+      ui_label: Соотношение сторон
+      ui_order: 2
+    resolution:
+      type: string
+      required: true
+      values: &supported_resolutions
+      - 2K
+      - 4K
+      variant: true
+      default: 2K
+      ui_label: Качество
+      ui_order: 3
+  pricing:
+  - variant_values:
+      resolution: 2K
+    price: 3
+  - variant_values:
+      resolution: 4K
+    price: 4
+- api_model_id: gpt-image-2-image-to-image
+  title: Image-to-Image
+  input_mode: image_required
+  sort_order: 20
+  parameters:
+    prompt:
+      type: string
+      required: true
+      max_length: 20000
+      ui_label: Запрос
+      ui_order: 1
+    input_urls:
+      type: array
+      required: true
+      max_images: 16
+      max_image_size_mb: 30
+      accepted_types:
+      - image/jpeg
+      - image/png
+      - image/webp
+      - image/jpg
+      ui_label: Фото для референса
+      ui_order: 2
+    aspect_ratio:
+      type: string
+      required: false
+      values: *supported_aspect_ratios
+      default: auto
+      ui_label: Соотношение сторон
+      ui_order: 3
+    resolution:
+      type: string
+      required: true
+      values: *supported_resolutions
+      variant: true
+      default: 2K
+      ui_label: Качество
+      ui_order: 4
+  pricing:
+  - variant_values:
+      resolution: 2K
+    price: 3
+  - variant_values:
+      resolution: 4K
+    price: 4

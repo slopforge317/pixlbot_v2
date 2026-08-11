@@ -45,3 +45,7 @@ legacy-БД запускайте его только после migrations, `ale
 ```
 
 Серверный порядок действий описан в `docs/deployment.md`.
+
+Модели хранятся по одному файлу в `apps/backend/catalog/models`. Правила
+добавления, валидации, просмотра diff и применения описаны в
+`apps/backend/docs/model-catalog.md`.

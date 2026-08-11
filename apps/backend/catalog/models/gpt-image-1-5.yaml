@@ -1,0 +1,89 @@
+slug: gpt-image-1-5
+title: GPT Image 1.5
+sort_order: 50
+implementations:
+- api_model_id: gpt-image/1.5-text-to-image
+  title: Text-to-Image
+  input_mode: text_only
+  sort_order: 10
+  status: Basic*
+  parameters:
+    prompt:
+      type: string
+      required: true
+      max_length: 3000
+      ui_label: Запрос
+      ui_order: 1
+    aspect_ratio:
+      type: string
+      required: true
+      values:
+      - '1:1'
+      - '2:3'
+      - '3:2'
+      default: '3:2'
+      ui_label: Соотношение сторон
+      ui_order: 2
+    quality:
+      type: string
+      required: true
+      values:
+      - medium
+      - high
+      variant: true
+      default: medium
+      ui_label: Качество
+      ui_order: 3
+  pricing:
+  - variant_values:
+      quality: medium
+    price: 2
+  - variant_values:
+      quality: high
+    price: 5
+- api_model_id: gpt-image/1.5-image-to-image
+  title: Image-to-Image
+  input_mode: image_required
+  sort_order: 20
+  status: Basic*
+  parameters:
+    input_urls:
+      type: array
+      required: true
+      max_images: 1
+      max_image_size_mb: 10
+      ui_label: Фото для референса
+      ui_order: 1
+    prompt:
+      type: string
+      required: true
+      max_length: 3000
+      ui_label: Запрос
+      ui_order: 2
+    aspect_ratio:
+      type: string
+      required: true
+      values:
+      - '1:1'
+      - '2:3'
+      - '3:2'
+      default: '3:2'
+      ui_label: Соотношение сторон
+      ui_order: 3
+    quality:
+      type: string
+      required: true
+      values:
+      - medium
+      - high
+      variant: true
+      default: medium
+      ui_label: Качество
+      ui_order: 4
+  pricing:
+  - variant_values:
+      quality: medium
+    price: 2
+  - variant_values:
+      quality: high
+    price: 5

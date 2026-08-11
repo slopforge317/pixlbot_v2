@@ -1,0 +1,62 @@
+slug: nano-banana-pro
+title: Nano Banana Pro
+sort_order: 20
+implementations:
+- api_model_id: nano-banana-pro
+  title: Nano Banana Pro
+  input_mode: image_optional
+  sort_order: 10
+  status: Pro
+  parameters:
+    prompt:
+      type: string
+      required: true
+      max_length: 20000
+      ui_label: Запрос
+      ui_order: 1
+    image_input:
+      type: array
+      required: false
+      max_images: 8
+      max_image_size_mb: 30
+      ui_label: Фото для референса
+      ui_order: 2
+    aspect_ratio:
+      type: string
+      required: false
+      values:
+      - '1:1'
+      - '2:3'
+      - '3:2'
+      - '3:4'
+      - '4:3'
+      - '4:5'
+      - '5:4'
+      - '9:16'
+      - '16:9'
+      - '21:9'
+      - auto
+      default: '16:9'
+      ui_label: Соотношение сторон
+      ui_order: 3
+    resolution:
+      type: string
+      required: false
+      values:
+      - 2K
+      - 4K
+      variant: false
+      default: 2K
+      ui_label: Разрешение
+      ui_order: 4
+    output_format:
+      type: string
+      required: false
+      values:
+      - png
+      - jpg
+      default: png
+      ui_label: Формат файла
+      ui_order: 5
+  pricing:
+  - price: 5

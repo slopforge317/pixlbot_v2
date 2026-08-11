@@ -197,7 +197,7 @@ app/
 | `active` | Boolean | Yes | Available for use (default: true) |
 
 ##### Variant System
-Parameters with `variant: true` in `api_parameters.yaml` become `variant_keys` on the model. Each combination of variant values gets its own `pricing_variants` row with a specific price:
+Parameters with `variant: true` in `catalog/models/*.yaml` become `variant_keys` on the model. Each combination of variant values gets its own `pricing_variants` row with a specific price:
 
 | Model | variant_keys | Example pricing rows |
 |-------|-------------|---------------------|
@@ -206,7 +206,7 @@ Parameters with `variant: true` in `api_parameters.yaml` become `variant_keys` o
 | gpt-image/1.5-* | ["quality"] | {quality: "medium"}, {quality: "high"} |
 
 ##### `input_schema` JSON Structure
-The `input_schema` field stores the full parameter definition from `api_parameters.yaml`:
+The `input_schema` field stores the full parameter definition from the model catalog:
 ```json
 {
   "prompt": {"type": "string", "required": true},
