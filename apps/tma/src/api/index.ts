@@ -22,6 +22,8 @@ export type {
   User,
   UserBalance,
   // Provider → Model → PricingVariant
+  FieldOptionValue,
+  FieldOption,
   FieldSchema,
   PricingVariant,
   AIModel,

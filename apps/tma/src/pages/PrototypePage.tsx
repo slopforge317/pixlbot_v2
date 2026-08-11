@@ -1,7 +1,7 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { BorderBeam } from "border-beam"
 
-import { api, type AIModel, type Provider } from "@/api"
+import { api, type FieldOptionValue, type Provider } from "@/api"
 import { SurfaceCard } from "@/components/primitives/surface-card"
 import {
   Attachment,
@@ -23,10 +23,18 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  buildParameterValues,
+  encodeOptionValue,
+  findPricingVariant,
+  getMinProviderPrice,
+  getModelParameterFields,
+  getReferenceField,
+  getSelectableOptions,
+  selectModelForReference,
+  sortProviders,
+} from "@/lib/model-catalog"
 
-const aspectRatios = ["1:1", "4:5", "9:16", "16:9"] as const
-const qualities = ["Draft", "Standard", "HD"] as const
-const formats = ["PNG", "JPG", "WEBP"] as const
 const promptPlaceholder =
   "Портрет в мягком студийном свете, чистый фон, естественная кожа, высокая детализация"
 const promptPreviewLimit = 155
@@ -38,20 +46,6 @@ type ReferenceImage = {
   url: string
 }
 type ModelsLoadStatus = "idle" | "loading" | "success" | "error"
-type ModelOption = {
-  id: string
-  model: AIModel
-  provider: Provider
-  price: number | null
-}
-
-function getMinModelPrice(model: AIModel) {
-  if (model.pricing.length === 0) {
-    return null
-  }
-
-  return Math.min(...model.pricing.map((variant) => variant.price))
-}
 
 function formatModelPrice(price: number | null) {
   return price === null ? "Цена не задана" : `от ${price} credits`
@@ -140,31 +134,51 @@ export function PrototypePage() {
   const [providers, setProviders] = useState<Provider[]>([])
   const [modelsLoadStatus, setModelsLoadStatus] = useState<ModelsLoadStatus>("idle")
   const [modelsError, setModelsError] = useState("")
-  const [selectedModel, setSelectedModel] = useState("")
+  const [selectedProvider, setSelectedProvider] = useState("")
   const [prompt, setPrompt] = useState("")
   const [referenceImage, setReferenceImage] = useState<ReferenceImage | null>(null)
-  const [aspectRatio, setAspectRatio] = useState<(typeof aspectRatios)[number]>("4:5")
-  const [quality, setQuality] = useState<(typeof qualities)[number]>("Standard")
-  const [format, setFormat] = useState<(typeof formats)[number]>("PNG")
+  const [referenceError, setReferenceError] = useState("")
+  const [parameterValues, setParameterValues] = useState<Record<string, unknown>>({})
   const [status, setStatus] = useState<"idle" | "queued">("idle")
 
-  const modelOptions = useMemo<ModelOption[]>(
-    () =>
-      providers.flatMap((provider) =>
-        provider.models.map((model) => ({
-          id: String(model.id),
-          model,
-          provider,
-          price: getMinModelPrice(model),
-        })),
-      ),
+  const visibleProviders = useMemo(
+    () => sortProviders(providers.filter((provider) => provider.gen_type === "image")),
     [providers],
   )
 
-  const currentModel = useMemo(
-    () => modelOptions.find((model) => model.id === selectedModel) ?? null,
-    [modelOptions, selectedModel],
+  const currentProvider = useMemo(
+    () =>
+      visibleProviders.find((provider) => provider.slug === selectedProvider) ?? null,
+    [selectedProvider, visibleProviders],
   )
+
+  const currentModel = useMemo(
+    () => selectModelForReference(currentProvider, Boolean(referenceImage)),
+    [currentProvider, referenceImage],
+  )
+
+  const parameterFields = useMemo(
+    () => getModelParameterFields(currentModel),
+    [currentModel],
+  )
+  const referenceField = useMemo(
+    () => getReferenceField(currentProvider),
+    [currentProvider],
+  )
+  const currentVariant = useMemo(
+    () => findPricingVariant(currentModel, parameterValues),
+    [currentModel, parameterValues],
+  )
+  const currentPrice = currentVariant?.price ?? null
+  const promptSchema = currentModel?.input_schema.prompt
+  const promptMaxLength =
+    typeof promptSchema?.max_length === "number" ? promptSchema.max_length : 2000
+
+  const referenceMaxSizeMb = referenceField?.schema.max_image_size_mb ?? 10
+
+  const modelPrice = currentProvider
+    ? currentPrice ?? getMinProviderPrice(currentProvider)
+    : null
 
   const loadModels = useCallback(async () => {
     setModelsLoadStatus("loading")
@@ -187,18 +201,23 @@ export function PrototypePage() {
   }, [loadModels])
 
   useEffect(() => {
-    if (modelOptions.length === 0) {
-      if (selectedModel) {
-        setSelectedModel("")
+    if (visibleProviders.length === 0) {
+      if (selectedProvider) {
+        setSelectedProvider("")
       }
 
       return
     }
 
-    if (!modelOptions.some((model) => model.id === selectedModel)) {
-      setSelectedModel(modelOptions[0].id)
+    if (!visibleProviders.some((provider) => provider.slug === selectedProvider)) {
+      setSelectedProvider(visibleProviders[0].slug)
     }
-  }, [modelOptions, selectedModel])
+  }, [selectedProvider, visibleProviders])
+
+  useEffect(() => {
+    setParameterValues((current) => buildParameterValues(parameterFields, current))
+    setStatus("idle")
+  }, [parameterFields])
 
   useEffect(() => {
     return () => {
@@ -215,6 +234,12 @@ export function PrototypePage() {
       return
     }
 
+    if (file.size > referenceMaxSizeMb * 1024 * 1024) {
+      setReferenceError(`Файл больше ${referenceMaxSizeMb} MB`)
+      return
+    }
+
+    setReferenceError("")
     setReferenceImage({
       name: file.name,
       url: URL.createObjectURL(file),
@@ -223,7 +248,11 @@ export function PrototypePage() {
   }
 
   return (
-    <main className="h-svh bg-background text-foreground">
+    <main
+      className="h-svh bg-background text-foreground"
+      data-active-api-model={currentModel?.api_model_id}
+      data-selected-provider={currentProvider?.slug}
+    >
       <Tabs
         className="mx-auto flex h-svh w-full max-w-mini-app flex-col overflow-hidden bg-background px-16 py-16 pb-[calc(16px+env(safe-area-inset-bottom))]"
         onValueChange={(value) => setActiveScreen(value as ScreenId)}
@@ -252,16 +281,18 @@ export function PrototypePage() {
                   Выберите модель
                 </label>
                 <span className="font-technical text-caption text-muted-foreground">
-                  {currentModel ? formatModelPrice(currentModel.price) : "Модели"}
+                  {currentProvider ? formatModelPrice(modelPrice) : "Модели"}
                 </span>
               </div>
               <Select
                 onValueChange={(value) => {
-                  setSelectedModel(value)
+                  setSelectedProvider(value)
                   setStatus("idle")
                 }}
-                disabled={modelsLoadStatus === "loading" || modelOptions.length === 0}
-                value={selectedModel}
+                disabled={
+                  modelsLoadStatus === "loading" || visibleProviders.length === 0
+                }
+                value={selectedProvider}
               >
                 <SelectTrigger id="generation-model">
                   <SelectValue
@@ -274,23 +305,18 @@ export function PrototypePage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {modelOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.model.title}
+                    {visibleProviders.map((provider) => (
+                      <SelectItem key={provider.slug} value={provider.slug}>
+                        {provider.title}
                       </SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              {currentModel ? (
-                <div className="flex items-center justify-between gap-12">
-                  <span className="truncate text-caption text-muted-foreground">
-                    {currentModel.provider.title}
-                  </span>
-                  {currentModel.model.status ? (
-                    <Badge variant="blue">{currentModel.model.status}</Badge>
-                  ) : null}
-                </div>
+              {currentModel?.status ? (
+                <Badge className="justify-self-start" variant="blue">
+                  {currentModel.status}
+                </Badge>
               ) : null}
               {modelsLoadStatus === "error" ? (
                 <div className="grid gap-8">
@@ -313,10 +339,11 @@ export function PrototypePage() {
                   Описание кадра
                 </div>
                 <p className="font-technical text-caption text-muted-foreground">
-                  {prompt.length}/500
+                  {prompt.length}/{promptMaxLength}
                 </p>
               </div>
               <Textarea
+                maxLength={promptMaxLength}
                 onChange={(event) => {
                   setPrompt(event.target.value)
                   setStatus("idle")
@@ -340,6 +367,7 @@ export function PrototypePage() {
                   <input
                     accept="image/*"
                     className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                    disabled={!referenceField}
                     key={referenceImage?.url ?? "empty-reference"}
                     onChange={handleReferenceChange}
                     type="file"
@@ -368,7 +396,9 @@ export function PrototypePage() {
                       Загрузить изображение
                     </AttachmentTitle>
                     <AttachmentDescription className="mt-0 text-caption">
-                      JPG, PNG или WEBP до 10 MB
+                      {referenceField
+                        ? `JPG, PNG или WEBP до ${referenceMaxSizeMb} MB`
+                        : "Эта модель не поддерживает референс"}
                     </AttachmentDescription>
                   </AttachmentContent>
                 )}
@@ -376,42 +406,47 @@ export function PrototypePage() {
               {referenceImage ? (
                 <button
                   className="justify-self-start rounded-button border border-border px-12 py-6 text-caption font-medium hover:bg-muted"
-                  onClick={() => setReferenceImage(null)}
+                  onClick={() => {
+                    setReferenceImage(null)
+                    setReferenceError("")
+                  }}
                   type="button"
                 >
                   Удалить референс
                 </button>
               ) : null}
+              {referenceError ? (
+                <p className="text-caption text-red-600">{referenceError}</p>
+              ) : null}
             </SurfaceCard>
 
-            <SurfaceCard>
-              <div className="grid gap-4">
-                <div className="font-technical text-caption font-medium text-muted-foreground">
-                  Параметры
+            {parameterFields.length > 0 ? (
+              <SurfaceCard>
+                <div className="grid gap-4">
+                  <div className="font-technical text-caption font-medium text-muted-foreground">
+                    Параметры
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-8">
-                <SelectField
-                  label="Соотношение"
-                  options={aspectRatios}
-                  value={aspectRatio}
-                  onChange={setAspectRatio}
-                />
-                <SelectField
-                  label="Качество"
-                  options={qualities}
-                  value={quality}
-                  onChange={setQuality}
-                />
-                <SelectField
-                  label="Формат"
-                  options={formats}
-                  value={format}
-                  onChange={setFormat}
-                />
-              </div>
-            </SurfaceCard>
+                <div className="grid grid-cols-2 gap-8">
+                  {parameterFields.map((field) => (
+                    <DynamicSelectField
+                      key={field.key}
+                      label={field.schema.ui_label}
+                      onChange={(value) => {
+                        setParameterValues((current) => ({
+                          ...current,
+                          [field.key]: value,
+                        }))
+                        setStatus("idle")
+                      }}
+                      options={getSelectableOptions(field.schema)}
+                      value={parameterValues[field.key] as FieldOptionValue | undefined}
+                    />
+                  ))}
+                </div>
+              </SurfaceCard>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="history">
@@ -426,7 +461,7 @@ export function PrototypePage() {
         {activeScreen === "generation" ? (
           <footer className="grid gap-10 border-t border-border bg-background pt-12">
             <Button
-              disabled={!currentModel}
+              disabled={!currentModel || !currentVariant || prompt.trim().length === 0}
               onClick={() => setStatus("queued")}
               size="lg"
               type="button"
@@ -599,27 +634,37 @@ function PaymentScreen() {
   )
 }
 
-type SelectFieldProps<T extends string> = {
+type DynamicSelectFieldProps = {
   label: string
-  options: readonly T[]
-  value: T
-  onChange: (value: T) => void
+  options: ReturnType<typeof getSelectableOptions>
+  value: FieldOptionValue | undefined
+  onChange: (value: FieldOptionValue) => void
 }
 
-function SelectField<T extends string>({
+function DynamicSelectField({
   label,
   options,
   value,
   onChange,
-}: SelectFieldProps<T>) {
+}: DynamicSelectFieldProps) {
+  const encodedValue =
+    value === undefined ? undefined : encodeOptionValue(value)
+
   return (
     <div className="grid min-w-0 gap-6">
       <span className="truncate text-caption font-medium text-muted-foreground">
         {label}
       </span>
       <Select
-        onValueChange={(nextValue) => onChange(nextValue as T)}
-        value={value}
+        onValueChange={(nextValue) => {
+          const option = options.find(
+            (candidate) => encodeOptionValue(candidate.value) === nextValue,
+          )
+          if (option) {
+            onChange(option.value)
+          }
+        }}
+        value={encodedValue}
       >
         <SelectTrigger className="h-40 px-8 text-caption [font-size:var(--text-caption)] [line-height:var(--text-caption--line-height)]">
           <SelectValue />
@@ -627,8 +672,11 @@ function SelectField<T extends string>({
         <SelectContent>
           <SelectGroup>
             {options.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option}
+              <SelectItem
+                key={encodeOptionValue(option.value)}
+                value={encodeOptionValue(option.value)}
+              >
+                {option.label}
               </SelectItem>
             ))}
           </SelectGroup>

@@ -10,6 +10,14 @@ export type JobStatus = "queue" | "processing" | "done" | "error";
 
 export type ContentType = "image" | "video";
 
+export type FieldOptionValue = string | number | boolean;
+
+export interface FieldOption {
+  value: FieldOptionValue;
+  label: string;
+  sort_order: number;
+}
+
 // =============================================================================
 // User
 // =============================================================================
@@ -38,7 +46,8 @@ export interface FieldSchema {
   ui_label: string;
   ui_order?: number;
   default?: unknown;
-  values?: string[];
+  values?: FieldOptionValue[];
+  options?: FieldOption[];
   max_length?: number | boolean; // can be `true` due to seed data bug
   variant?: boolean;
   max_images?: number;

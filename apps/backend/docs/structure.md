@@ -201,23 +201,35 @@ Parameters with `variant: true` in `api_parameters.yaml` become `variant_keys` o
 
 | Model | variant_keys | Example pricing rows |
 |-------|-------------|---------------------|
-| nano-banana-pro | ["resolution"] | {resolution: "2K"}, {resolution: "4K"} |
+| nano-banana-pro | [] | {} (single price) |
 | seedream/4.5-text-to-image | [] | {} (single price) |
 | gpt-image/1.5-* | ["quality"] | {quality: "medium"}, {quality: "high"} |
-| sora-2-pro-* | ["n_frames", "size"] | 4 combos (10/15 × standard/high) |
-| kling-2.6/* | ["sound", "duration"] | 4 combos (true/false × 5/10) |
 
 ##### `input_schema` JSON Structure
 The `input_schema` field stores the full parameter definition from `api_parameters.yaml`:
 ```json
 {
   "prompt": {"type": "string", "required": true},
-  "aspect_ratio": {"type": "enum", "values": ["1:1", "16:9", "9:16"]},
-  "n_frames": {"type": "enum", "values": ["10", "15"], "variant": true},
-  "size": {"type": "enum", "values": ["standard", "high"], "variant": true}
+  "aspect_ratio": {
+    "type": "string",
+    "ui_order": 20,
+    "options": [
+      {"value": "1:1", "label": "1:1", "sort_order": 10},
+      {"value": "16:9", "label": "16:9", "sort_order": 20}
+    ]
+  },
+  "quality": {
+    "type": "string",
+    "variant": true,
+    "options": [
+      {"value": "medium", "label": "medium", "sort_order": 10},
+      {"value": "high", "label": "high", "sort_order": 20}
+    ]
+  }
 }
 ```
 - Parameters with `variant: true` are used for pricing differentiation
+- Seed converts YAML `values` to ordered API `options`
 - All parameters are sent to the frontend for UI rendering
 
 ##### Provider → Model → Pricing Hierarchy

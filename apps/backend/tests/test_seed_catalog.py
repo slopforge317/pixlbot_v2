@@ -7,6 +7,7 @@ import pytest
 from scripts.seed_db import (
     load_api_parameters,
     load_seed_prices,
+    normalize_input_schema,
     validate_catalog,
 )
 
@@ -51,3 +52,22 @@ def test_catalog_rejects_pricing_keys_not_marked_as_variants() -> None:
 
     with pytest.raises(ValueError, match="Pricing keys"):
         validate_catalog(api_params, prices)
+
+
+def test_input_schema_has_stable_field_and_option_order() -> None:
+    schema = normalize_input_schema(
+        {
+            "quality": {
+                "type": "string",
+                "ui_order": 2,
+                "values": ["medium", "high"],
+            }
+        }
+    )
+
+    assert schema["quality"]["ui_order"] == 20
+    assert schema["quality"]["options"] == [
+        {"value": "medium", "label": "medium", "sort_order": 10},
+        {"value": "high", "label": "high", "sort_order": 20},
+    ]
+    assert "values" not in schema["quality"]

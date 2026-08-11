@@ -11,6 +11,7 @@ Usage:
 import asyncio
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +73,43 @@ def extract_variant_keys(parameters: dict[str, Any]) -> list[str]:
         if isinstance(spec, dict) and spec.get("variant") is True:
             variant_keys.append(key)
     return variant_keys
+
+
+def normalize_input_schema(parameters: dict[str, Any]) -> dict[str, Any]:
+    """Build frontend schema with stable field and option ordering."""
+    normalized = deepcopy(parameters)
+
+    for spec in normalized.values():
+        if not isinstance(spec, dict):
+            continue
+
+        ui_order = spec.get("ui_order")
+        if isinstance(ui_order, int) and 0 < ui_order < 10:
+            spec["ui_order"] = ui_order * 10
+
+        values = spec.pop("values", None)
+        if not isinstance(values, list):
+            continue
+
+        options: list[dict[str, Any]] = []
+        for index, item in enumerate(values, start=1):
+            if isinstance(item, dict):
+                option = dict(item)
+                option.setdefault("label", str(option["value"]))
+                option.setdefault("sort_order", index * 10)
+            else:
+                option = {
+                    "value": item,
+                    "label": str(item),
+                    "sort_order": index * 10,
+                }
+            options.append(option)
+
+        spec["options"] = sorted(
+            options, key=lambda option: (option["sort_order"], str(option["value"]))
+        )
+
+    return normalized
 
 
 def validate_catalog(
@@ -310,7 +348,7 @@ async def seed_data(
 
             # Extract variant_keys and input_schema
             variant_keys = extract_variant_keys(input_params)
-            input_schema = input_params
+            input_schema = normalize_input_schema(input_params)
 
             # Upsert model for each api_model_id
             for api_model_id in model_values:

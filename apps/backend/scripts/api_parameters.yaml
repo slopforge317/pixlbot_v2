@@ -425,14 +425,14 @@ providers:
       input_urls:
         type: array
         required: true
+        max_images: 1
+        max_image_size_mb: 10
         ui_label: Фото для референса
         ui_order: 1
       prompt:
         type: string
         required: true
         max_length: 3000
-        max_images: 1
-        max_image_size_mb: 10
         ui_label: Запрос
         ui_order: 2
       aspect_ratio:

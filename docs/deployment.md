@@ -110,7 +110,7 @@ docker compose \
   run --rm migrate python -m alembic check
 ```
 
-Ожидаемый head: `20260805_0001`. `alembic check` должен сообщить, что новых
+Ожидаемый head: `20260811_0001`. `alembic check` должен сообщить, что новых
 операций не обнаружено. При другом результате остановитесь и сохраните вывод.
 
 ## 7. Проверить и обезвредить test-данные
@@ -192,9 +192,26 @@ sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
 git pull --ff-only
 docker compose --env-file .env.test -f compose.test.yaml build
 docker compose --env-file .env.test -f compose.test.yaml run --rm migrate
+docker compose --env-file .env.test -f compose.test.yaml run --rm migrate python -m alembic current
+docker compose --env-file .env.test -f compose.test.yaml run --rm migrate python -m alembic check
+docker compose --env-file .env.test -f compose.test.yaml --profile tools run --rm seed
 docker compose --env-file .env.test -f compose.test.yaml up -d
 curl --fail https://tma.pixlbot.ru/health
 ```
+
+После обновления каталога проверьте активные публичные модели:
+
+```bash
+docker compose \
+  --env-file .env.test \
+  -f compose.test.yaml \
+  exec -T postgres \
+  psql --username=pixlbot --dbname=pixlbot \
+  --command="SELECT slug, title, sort_order FROM providers WHERE active ORDER BY sort_order, id;"
+```
+
+Ожидаются только image-модели: Nano Banana 2, Nano Banana Pro, Seedream 5 Lite,
+Seedream 4.5 и GPT Image 1.5. Sora/Kling должны отсутствовать.
 
 ## Остановка и восстановление
 

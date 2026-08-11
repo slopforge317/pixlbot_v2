@@ -206,16 +206,21 @@ Authorization: tma <initData>
               "type": "string",
               "required": true,
               "ui_label": "Prompt",
-              "ui_order": 1,
+              "ui_order": 10,
               "max_length": 2000
             },
             "aspect_ratio": {
               "type": "string",
               "required": true,
               "ui_label": "Aspect ratio",
-              "ui_order": 2,
+              "ui_order": 20,
               "default": "1:1",
-              "values": ["1:1", "4:5", "9:16", "16:9"],
+              "options": [
+                {"value": "1:1", "label": "1:1", "sort_order": 10},
+                {"value": "4:5", "label": "4:5", "sort_order": 20},
+                {"value": "9:16", "label": "9:16", "sort_order": 30},
+                {"value": "16:9", "label": "16:9", "sort_order": 40}
+              ],
               "variant": true
             }
           },
@@ -253,7 +258,7 @@ Authorization: tma <initData>
 | `ui_label` | Label для UI |
 | `ui_order` | Порядок отображения |
 | `default` | Значение по умолчанию |
-| `values` | Допустимые значения для select/carousel |
+| `options` | Допустимые значения: `value`, UI-подпись `label`, порядок `sort_order` |
 | `max_length` | Максимальная длина строки. Иногда может быть `true`, frontend должен это игнорировать как число |
 | `variant` | Поле влияет на выбор pricing variant |
 | `max_images` | Максимум изображений для image upload поля |
