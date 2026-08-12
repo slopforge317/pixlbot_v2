@@ -1,10 +1,10 @@
 """Generation API schemas."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from db.enums import JobStatus
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 
 class ModelInfo(BaseModel):
@@ -51,6 +51,13 @@ class GenerationResponse(BaseModel):
     prompt: str
     created_at: datetime
 
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime) -> str:
+        """Serialize DB timestamps as UTC so clients can convert to local time."""
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
     model_config = {"from_attributes": True}
 
 
@@ -63,6 +70,15 @@ class GenerationDetailResponse(GenerationResponse):
     result_url: str | None = None  # success_url_asset
     error_message: str | None = None
     completed_at: datetime | None = None
+
+    @field_serializer("completed_at")
+    def serialize_completed_at(self, value: datetime | None) -> str | None:
+        """Serialize provider completion time as UTC when present."""
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 class GenerationListResponse(BaseModel):

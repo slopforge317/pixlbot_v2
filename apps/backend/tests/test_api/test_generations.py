@@ -1,5 +1,6 @@
 """Integration tests for generations API."""
 
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -464,10 +465,14 @@ class TestListGenerations:
             job = GenerationJob(
                 user_id=user.user_id,
                 pricing_variant_id=pv.id,
-                status=JobStatus.done if i < 2 else JobStatus.queue,
+                status=JobStatus.done if i < 2 else JobStatus.error,
                 cost_credit=10,
                 prompt=f"Test prompt {i}",
                 generation_params={"prompt": f"Test prompt {i}"},
+                error="Generation failed" if i == 2 else None,
+                provider_complete_time=(
+                    datetime(2026, 7, 9, 10, 1) if i == 0 else None
+                ),
             )
             session.add(job)
         await session.commit()
@@ -484,6 +489,16 @@ class TestListGenerations:
         assert len(data["generations"]) == 3
         assert data["limit"] == 10
         assert data["offset"] == 0
+        assert data["generations"][0]["created_at"].endswith("Z")
+        failed_generation = next(
+            item for item in data["generations"] if item["status"] == "error"
+        )
+        assert failed_generation["error_message"] == "Generation failed"
+        assert failed_generation["completed_at"] is None
+        completed_generation = next(
+            item for item in data["generations"] if item["completed_at"] is not None
+        )
+        assert completed_generation["completed_at"] == "2026-07-09T10:01:00Z"
 
     @pytest.mark.asyncio
     @patch("services.auth.init_data.settings")

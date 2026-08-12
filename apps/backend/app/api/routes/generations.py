@@ -241,6 +241,8 @@ async def list_generations(
             provider_title=provider.title if provider else None,
             result_url=job.success_url_asset,
             params=job.generation_params,
+            error_message=job.error,
+            completed_at=job.provider_complete_time,
         )
         generations.append(gen)
 

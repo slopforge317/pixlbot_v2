@@ -13,6 +13,8 @@ import {
   InsufficientCreditsAPIError,
   UnauthorizedError,
   type FieldOptionValue,
+  type GenerationDetail,
+  type JobStatus,
   type Provider,
 } from "@/api"
 import { SurfaceCard } from "@/components/primitives/surface-card"
@@ -54,7 +56,6 @@ const promptPreviewLimit = 155
 const allowedReferenceTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 
 type ScreenId = "generation" | "history" | "payment"
-type HistoryStatus = "Готово" | "В работе" | "Ошибка"
 type ReferenceUploadStatus = "uploading" | "uploaded" | "error"
 type ReferenceImage = {
   file: File
@@ -66,6 +67,9 @@ type ReferenceImage = {
 }
 type ModelsLoadStatus = "idle" | "loading" | "success" | "error"
 type GenerationStatus = "idle" | "submitting" | "queued" | "error"
+type HistoryLoadStatus = "loading" | "success" | "error"
+type ResultAvailability = "loading" | "available" | "unavailable"
+type SendOriginalStatus = "idle" | "sending" | "sent" | "error"
 
 function formatCreditPrice(price: number | null) {
   if (price === null) {
@@ -123,50 +127,63 @@ function getReferenceUploadErrorMessage(error: unknown) {
   return "Не удалось загрузить изображение"
 }
 
+function getHistoryErrorMessage(error: unknown) {
+  if (error instanceof UnauthorizedError) {
+    return "Нет Telegram initData. Откройте Mini App внутри Telegram."
+  }
+  return "Не удалось загрузить историю."
+}
+
+function formatHistoryTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return "Время неизвестно"
+  }
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const dayDifference = Math.round(
+    (today.getTime() - targetDay.getTime()) / (24 * 60 * 60 * 1000),
+  )
+  const time = new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)
+
+  if (dayDifference === 0) {
+    return `Сегодня, ${time}`
+  }
+  if (dayDifference === 1) {
+    return `Вчера, ${time}`
+  }
+
+  const day = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+  }).format(date)
+  return `${day}, ${time}`
+}
+
 const navItems: Array<{ id: ScreenId; label: string }> = [
   { id: "generation", label: "Генерация" },
   { id: "history", label: "История" },
   { id: "payment", label: "Оплата" },
 ]
 
-const historyStatusVariants: Record<HistoryStatus, "green" | "orange" | "red"> = {
-  Готово: "green",
-  "В работе": "orange",
-  Ошибка: "red",
+const historyStatusLabels: Record<JobStatus, string> = {
+  queue: "В обработке",
+  processing: "В обработке",
+  done: "Готово",
+  error: "Ошибка",
 }
 
-const historyItems = [
-  {
-    id: "job-1842",
-    title: "Студийный портрет",
-    model: "Portrait Pro",
-    meta: "4:5 · Standard · PNG",
-    prompt:
-      "Портрет в мягком студийном свете, чистый фон, естественная кожа, высокая детализация, взгляд в камеру, фотореализм, аккуратная ретушь и натуральные оттенки кожи.",
-    status: "Готово" as HistoryStatus,
-    time: "12 мин назад",
-  },
-  {
-    id: "job-1839",
-    title: "Карточка товара",
-    model: "Product Shot",
-    meta: "1:1 · HD · WEBP",
-    prompt:
-      "Минималистичная предметная съемка белых беспроводных наушников на светлом фоне, мягкие тени, коммерческий стиль, чистая композиция для карточки товара.",
-    status: "В работе" as HistoryStatus,
-    time: "Сегодня, 14:08",
-  },
-  {
-    id: "job-1831",
-    title: "Вариант по референсу",
-    model: "Style Transfer",
-    meta: "9:16 · Standard · JPG",
-    prompt:
-      "Сделай вертикальный fashion-кадр по референсу: городской вечерний свет, контрастная куртка, кинематографичный цвет, легкое зерно, уверенная поза.",
-    status: "Ошибка" as HistoryStatus,
-    time: "Вчера, 21:40",
-  },
-]
+const historyStatusVariants: Record<JobStatus, "green" | "orange" | "red"> = {
+  queue: "orange",
+  processing: "orange",
+  done: "green",
+  error: "red",
+}
 
 const paymentPackages = [
   {
@@ -755,45 +772,215 @@ export function PrototypePage() {
 }
 
 function HistoryScreen() {
-  const [expandedPromptIds, setExpandedPromptIds] = useState<Record<string, boolean>>({})
-  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null)
+  const [generations, setGenerations] = useState<GenerationDetail[]>([])
+  const [total, setTotal] = useState(0)
+  const [loadStatus, setLoadStatus] = useState<HistoryLoadStatus>("loading")
+  const [loadError, setLoadError] = useState("")
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [expandedPromptIds, setExpandedPromptIds] = useState<Record<number, boolean>>({})
+  const [copiedPromptId, setCopiedPromptId] = useState<number | null>(null)
+  const [resultAvailability, setResultAvailability] = useState<
+    Record<number, ResultAvailability>
+  >({})
+  const [sendStatuses, setSendStatuses] = useState<
+    Record<number, SendOriginalStatus>
+  >({})
 
-  function togglePrompt(id: string) {
+  const loadHistory = useCallback(async () => {
+    setLoadStatus("loading")
+    setLoadError("")
+
+    try {
+      const response = await api.getGenerations({ limit: 10, offset: 0 })
+      setGenerations(response.generations)
+      setTotal(response.total)
+      setLoadStatus("success")
+    } catch (error) {
+      setGenerations([])
+      setTotal(0)
+      setLoadError(getHistoryErrorMessage(error))
+      setLoadStatus("error")
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadHistory()
+  }, [loadHistory])
+
+  function togglePrompt(id: number) {
     setExpandedPromptIds((current) => ({
       ...current,
       [id]: !current[id],
     }))
   }
 
-  async function copyPrompt(id: string, prompt: string) {
+  async function copyPrompt(id: number, prompt: string) {
     await navigator.clipboard.writeText(prompt)
     setCopiedPromptId(id)
+  }
+
+  async function loadMore() {
+    setIsLoadingMore(true)
+    setLoadError("")
+
+    try {
+      const response = await api.getGenerations({
+        limit: 10,
+        offset: generations.length,
+      })
+      setGenerations((current) => [...current, ...response.generations])
+      setTotal(response.total)
+    } catch (error) {
+      setLoadError(getHistoryErrorMessage(error))
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
+  async function handleSendOriginal(jobId: number) {
+    setSendStatuses((current) => ({ ...current, [jobId]: "sending" }))
+
+    try {
+      await api.sendOriginal(jobId)
+      setSendStatuses((current) => ({ ...current, [jobId]: "sent" }))
+    } catch {
+      setSendStatuses((current) => ({ ...current, [jobId]: "error" }))
+    }
+  }
+
+  if (loadStatus === "loading") {
+    return (
+      <SurfaceCard className="min-h-160 place-items-center text-center">
+        <p className="text-body-sm text-muted-foreground">Загружаем историю...</p>
+      </SurfaceCard>
+    )
+  }
+
+  if (loadStatus === "error") {
+    return (
+      <SurfaceCard className="place-items-center text-center">
+        <p className="text-body-sm text-red-600">{loadError}</p>
+        <Button
+          onClick={() => void loadHistory()}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Повторить
+        </Button>
+      </SurfaceCard>
+    )
+  }
+
+  if (generations.length === 0) {
+    return (
+      <SurfaceCard className="min-h-160 place-items-center text-center">
+        <div className="grid gap-4">
+          <p className="text-body-sm font-semibold">История пока пуста</p>
+          <p className="text-caption text-muted-foreground">
+            Здесь появятся ваши генерации.
+          </p>
+        </div>
+      </SurfaceCard>
+    )
   }
 
   return (
     <section className="grid gap-12">
       <div className="grid gap-8">
-        {historyItems.map((item) => {
-          const isExpanded = Boolean(expandedPromptIds[item.id])
-          const canExpand = item.prompt.length > promptPreviewLimit
+        {generations.map((generation) => {
+          const isExpanded = Boolean(expandedPromptIds[generation.job_id])
+          const canExpand = generation.prompt.length > promptPreviewLimit
           const visiblePrompt =
             !isExpanded && canExpand
-              ? `${item.prompt.slice(0, promptPreviewLimit).trimEnd()}...`
-              : item.prompt
+              ? `${generation.prompt.slice(0, promptPreviewLimit).trimEnd()}...`
+              : generation.prompt
+          const availability = generation.result_url
+            ? (resultAvailability[generation.job_id] ?? "loading")
+            : "unavailable"
+          const sendStatus = sendStatuses[generation.job_id] ?? "idle"
+          const canSendOriginal =
+            generation.status === "done" && availability === "available"
 
           return (
-            <SurfaceCard className="gap-10" key={item.id}>
+            <SurfaceCard className="gap-10 overflow-hidden" key={generation.job_id}>
               <div className="flex items-start justify-between gap-12">
                 <div className="grid min-w-0 gap-4">
-                  <h3 className="truncate text-body-sm font-semibold">{item.title}</h3>
-                  <p className="font-technical text-caption text-muted-foreground">
-                    {item.model} · {item.meta}
-                  </p>
+                  <h3 className="truncate text-body-sm font-semibold">
+                    {generation.model_title ?? "Модель недоступна"}
+                  </h3>
+                  <Badge variant={historyStatusVariants[generation.status]}>
+                    {historyStatusLabels[generation.status]}
+                  </Badge>
                 </div>
-                <Badge variant={historyStatusVariants[item.status]}>
-                  {item.status}
-                </Badge>
+                <span className="shrink-0 font-technical text-caption text-muted-foreground">
+                  {formatCreditPrice(generation.cost_credit)}
+                </span>
               </div>
+
+              <div className="relative grid min-h-200 overflow-hidden rounded-input bg-muted">
+                {generation.status === "done" && generation.result_url ? (
+                  <img
+                    alt={`Результат генерации ${generation.model_title ?? ""}`}
+                    className="h-auto min-h-200 w-full object-cover"
+                    loading="lazy"
+                    onError={() =>
+                      setResultAvailability((current) => ({
+                        ...current,
+                        [generation.job_id]: "unavailable",
+                      }))
+                    }
+                    onLoad={() =>
+                      setResultAvailability((current) => ({
+                        ...current,
+                        [generation.job_id]: "available",
+                      }))
+                    }
+                    src={generation.result_url}
+                  />
+                ) : null}
+
+                {generation.status === "queue" || generation.status === "processing" ? (
+                  <div className="absolute inset-0 grid place-items-center p-20 text-center">
+                    <p className="text-body-sm font-medium text-muted-foreground">
+                      Обрабатывается
+                    </p>
+                  </div>
+                ) : null}
+
+                {generation.status === "error" ? (
+                  <div className="absolute inset-0 grid place-items-center p-20 text-center">
+                    <p className="text-body-sm font-medium text-muted-foreground">
+                      Произошла ошибка
+                    </p>
+                  </div>
+                ) : null}
+
+                {generation.status === "done" && availability === "loading" ? (
+                  <div className="pointer-events-none absolute inset-0 grid place-items-center bg-muted p-20 text-center">
+                    <p className="text-body-sm text-muted-foreground">
+                      Загружаем результат...
+                    </p>
+                  </div>
+                ) : null}
+
+                {generation.status === "done" && availability === "unavailable" ? (
+                  <div className="absolute inset-0 grid place-items-center bg-muted p-20 text-center">
+                    <div className="grid gap-4">
+                      <p className="text-body-sm font-medium">Файл больше недоступен</p>
+                      <p className="text-caption text-muted-foreground">
+                        Результаты хранятся до 14 дней
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {generation.status === "error" ? (
+                <p className="text-caption font-medium text-green-600">
+                  Кредиты возвращены
+                </p>
+              ) : null}
 
               <div className="grid gap-8 border-t border-border pt-10">
                 <div className="flex items-center justify-between gap-12">
@@ -803,7 +990,9 @@ function HistoryScreen() {
                   <button
                     aria-label="Скопировать промпт"
                     className="grid h-32 w-32 place-items-center rounded-button-rect border border-border bg-card text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    onClick={() => void copyPrompt(item.id, item.prompt)}
+                    onClick={() =>
+                      void copyPrompt(generation.job_id, generation.prompt)
+                    }
                     type="button"
                   >
                     <CopyIcon />
@@ -814,7 +1003,7 @@ function HistoryScreen() {
                   {canExpand ? (
                     <button
                       className="text-caption font-medium text-action-blue"
-                      onClick={() => togglePrompt(item.id)}
+                      onClick={() => togglePrompt(generation.job_id)}
                       type="button"
                     >
                       {isExpanded ? "Свернуть" : "Показать полностью"}
@@ -822,7 +1011,7 @@ function HistoryScreen() {
                   ) : (
                     <span />
                   )}
-                  {copiedPromptId === item.id ? (
+                  {copiedPromptId === generation.job_id ? (
                     <span className="font-technical text-caption text-muted-foreground">
                       Скопировано
                     </span>
@@ -832,16 +1021,48 @@ function HistoryScreen() {
 
               <div className="flex items-center justify-between gap-12 border-t border-border pt-8">
                 <span className="font-technical text-caption text-muted-foreground">
-                  {item.time}
+                  {formatHistoryTime(generation.created_at)}
                 </span>
-                <Button size="sm" type="button" variant="outline">
-                  Отправить оригинал
+                <Button
+                  disabled={
+                    !canSendOriginal ||
+                    sendStatus === "sending" ||
+                    sendStatus === "sent"
+                  }
+                  onClick={() => void handleSendOriginal(generation.job_id)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {sendStatus === "sending"
+                    ? "Отправляем..."
+                    : sendStatus === "sent"
+                      ? "Отправлено"
+                      : "Отправить оригинал"}
                 </Button>
               </div>
+              {sendStatus === "error" ? (
+                <p className="text-right text-caption text-red-600">
+                  Не удалось отправить оригинал
+                </p>
+              ) : null}
             </SurfaceCard>
           )
         })}
       </div>
+
+      {loadError ? <p className="text-center text-caption text-red-600">{loadError}</p> : null}
+
+      {generations.length < total ? (
+        <Button
+          disabled={isLoadingMore}
+          onClick={() => void loadMore()}
+          type="button"
+          variant="outline"
+        >
+          {isLoadingMore ? "Загружаем..." : "Показать ещё"}
+        </Button>
+      ) : null}
     </section>
   )
 }

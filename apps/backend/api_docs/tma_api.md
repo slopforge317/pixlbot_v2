@@ -346,7 +346,7 @@ Backend replaces valid object keys with temporary download URLs before calling K
   "pricing_variant_id": 100,
   "cost_credit": 10,
   "prompt": "A clean studio product photo",
-  "created_at": "2026-07-09T10:00:00.000000"
+  "created_at": "2026-07-09T10:00:00Z"
 }
 ```
 
@@ -400,7 +400,7 @@ Authorization: tma <initData>
       "pricing_variant_id": 100,
       "cost_credit": 10,
       "prompt": "A clean studio product photo",
-      "created_at": "2026-07-09T10:00:00.000000",
+      "created_at": "2026-07-09T10:00:00Z",
       "model_title": "Seedream 4.5 Text to Image",
       "provider_title": "Seedream",
       "params": {
@@ -409,7 +409,7 @@ Authorization: tma <initData>
       },
       "result_url": "https://example.com/result.png",
       "error_message": null,
-      "completed_at": "2026-07-09T10:01:00.000000"
+      "completed_at": "2026-07-09T10:01:00Z"
     }
   ],
   "total": 1,
@@ -425,6 +425,7 @@ Authorization: tma <initData>
 | `result_url` | URL результата. Обычно есть только при `status = done` |
 | `error_message` | Текст ошибки. Обычно есть только при `status = error` |
 | `params` | Input, с которым была создана генерация |
+| `created_at`, `completed_at` | UTC timestamps с суффиксом `Z`; frontend переводит их в локальное время устройства |
 | `total` | Общее количество jobs текущего пользователя с учетом `status` фильтра |
 
 ### Errors
@@ -454,7 +455,7 @@ Authorization: tma <initData>
   "pricing_variant_id": 100,
   "cost_credit": 10,
   "prompt": "A clean studio product photo",
-  "created_at": "2026-07-09T10:00:00.000000",
+  "created_at": "2026-07-09T10:00:00Z",
   "model_title": "Seedream 4.5 Text to Image",
   "provider_title": "Seedream",
   "params": {
@@ -463,7 +464,7 @@ Authorization: tma <initData>
   },
   "result_url": "https://example.com/result.png",
   "error_message": null,
-  "completed_at": "2026-07-09T10:01:00.000000"
+  "completed_at": "2026-07-09T10:01:00Z"
 }
 ```
 
