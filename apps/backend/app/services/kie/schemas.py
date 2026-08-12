@@ -49,6 +49,7 @@ class TaskStatusData(BaseModel):
     completeTime: int | None = None  # timestamp завершения
     createTime: int = 0  # timestamp создания
     updateTime: int = 0  # timestamp обновления
+    creditsConsumed: int | None = None
 
     def get_result_urls(self) -> list[str]:
         """Извлечь URL результатов из resultJson."""
@@ -91,6 +92,7 @@ class GenerationResult(BaseModel):
     model: str
     result_urls: list[str]
     cost_time_ms: int | None = None
+    credits_consumed: int | None = None
 
     @classmethod
     def from_task_status(cls, data: TaskStatusData) -> "GenerationResult":
@@ -100,4 +102,5 @@ class GenerationResult(BaseModel):
             model=data.model,
             result_urls=data.get_result_urls(),
             cost_time_ms=data.costTime,
+            credits_consumed=data.creditsConsumed,
         )

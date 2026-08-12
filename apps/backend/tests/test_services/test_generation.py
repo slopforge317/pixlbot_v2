@@ -10,6 +10,8 @@ from db.models import AIModel, GenerationJob, PricingVariant, Provider, User
 from db.repositories.generation import GenerationJobRepository
 from db.repositories.transaction import TransactionRepository
 from services.kie import GenerationResult, KieTaskFailedError, KieTaskTimeoutError
+from services.kie.enums import KieTaskState
+from services.kie.schemas import TaskStatusData
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.services.generation import (
@@ -19,6 +21,7 @@ from app.services.generation import (
     _handle_error,
     _handle_timeout,
     _process_generation_impl,
+    _process_kie_result_impl,
 )
 
 # Ensure callback mode is disabled for all generation tests
@@ -621,3 +624,111 @@ class TestProcessGenerationImpl:
         )
         assert refund is not None
         assert refund.amount_credits == test_job.cost_credit
+
+
+class TestProcessKieResult:
+    """Tests for terminal callback processing and idempotency."""
+
+    @staticmethod
+    def _status(
+        state: KieTaskState,
+        result_json: str = "",
+        fail_message: str = "",
+    ) -> TaskStatusData:
+        return TaskStatusData(
+            taskId="kie_task_callback",
+            model="seedream/4.5-edit",
+            state=state,
+            resultJson=result_json,
+            failMsg=fail_message,
+            creditsConsumed=3,
+        )
+
+    async def test_callback_success_updates_job(
+        self,
+        db_session: AsyncSession,
+        test_job: GenerationJob,
+        mock_bot: MagicMock,
+    ) -> None:
+        test_job.status = JobStatus.processing
+        test_job.provider_task_id = "kie_task_callback"
+        await db_session.commit()
+
+        status = self._status(
+            KieTaskState.success,
+            '{"resultUrls":["https://example.com/callback-result.jpg"]}',
+        )
+        with (
+            patch(
+                "app.services.generation.send_generation_result",
+                new_callable=AsyncMock,
+                return_value="telegram-file-id",
+            ),
+            patch("services.funnel.fire_trigger", new_callable=AsyncMock),
+        ):
+            await _process_kie_result_impl(
+                "kie_task_callback", status, db_session, mock_bot
+            )
+
+        await db_session.refresh(test_job)
+        assert test_job.status == JobStatus.done
+        assert test_job.success_url_asset == ("https://example.com/callback-result.jpg")
+        assert test_job.provider_consume_credit == 3
+
+    async def test_callback_failure_refunds_once_on_duplicate(
+        self,
+        db_session: AsyncSession,
+        test_job: GenerationJob,
+        test_user: User,
+        mock_bot: MagicMock,
+    ) -> None:
+        test_job.status = JobStatus.processing
+        test_job.provider_task_id = "kie_task_callback"
+        await db_session.commit()
+        status = self._status(KieTaskState.fail, fail_message="Provider failed")
+
+        with patch(
+            "app.services.generation.send_generation_error", new_callable=AsyncMock
+        ):
+            await _process_kie_result_impl(
+                "kie_task_callback", status, db_session, mock_bot
+            )
+            await _process_kie_result_impl(
+                "kie_task_callback", status, db_session, mock_bot
+            )
+
+        await db_session.refresh(test_job)
+        transactions = await TransactionRepository(db_session).get_user_transactions(
+            test_user.user_id
+        )
+        refunds = [tx for tx in transactions if tx.type == TransactionType.refund]
+        assert test_job.status == JobStatus.error
+        assert test_job.error == "Provider failed"
+        assert len(refunds) == 1
+
+    async def test_callback_success_without_result_is_refunded(
+        self,
+        db_session: AsyncSession,
+        test_job: GenerationJob,
+        test_user: User,
+        mock_bot: MagicMock,
+    ) -> None:
+        test_job.status = JobStatus.processing
+        test_job.provider_task_id = "kie_task_callback"
+        await db_session.commit()
+        status = self._status(KieTaskState.success, result_json="{}")
+
+        with patch(
+            "app.services.generation.send_generation_error", new_callable=AsyncMock
+        ):
+            await _process_kie_result_impl(
+                "kie_task_callback", status, db_session, mock_bot
+            )
+
+        await db_session.refresh(test_job)
+        transactions = await TransactionRepository(db_session).get_user_transactions(
+            test_user.user_id
+        )
+        assert test_job.status == JobStatus.error
+        assert test_job.error == "KIE returned no result URLs"
+        assert any(tx.type == TransactionType.refund for tx in transactions)

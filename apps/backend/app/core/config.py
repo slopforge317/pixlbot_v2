@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # KIE Callback (webhook) settings
     kie_callback_enabled: bool = False
     kie_callback_secret: str = ""
+    kie_webhook_hmac_key: str = ""
+    kie_webhook_max_age_seconds: int = 300
+    kie_reconciliation_interval_seconds: int = 60
+    kie_reconciliation_stale_seconds: int = 60
+    kie_reconciliation_batch_size: int = 100
 
     # TMA (Telegram Mini App)
     tma_url: str = ""  # URL Telegram Mini App (e.g. https://tma.pixlbot.online)

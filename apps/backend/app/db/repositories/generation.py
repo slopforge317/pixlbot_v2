@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from core.logging import log_repository
 from db.enums import JobStatus
 from db.models.ai_model import AIModel
@@ -33,6 +35,23 @@ class GenerationJobRepository(BaseRepository[GenerationJob]):
         stmt = (
             select(GenerationJob)
             .where(GenerationJob.status.in_([JobStatus.queue, JobStatus.processing]))
+            .order_by(GenerationJob.created_at.asc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_processing_jobs_for_reconciliation(
+        self, older_than: datetime, limit: int = 100
+    ) -> list[GenerationJob]:
+        """Find callback-mode jobs whose terminal callback may have been missed."""
+        stmt = (
+            select(GenerationJob)
+            .where(
+                GenerationJob.status == JobStatus.processing,
+                GenerationJob.provider_task_id.is_not(None),
+                GenerationJob.created_at <= older_than,
+            )
             .order_by(GenerationJob.created_at.asc())
             .limit(limit)
         )
@@ -140,6 +159,7 @@ class GenerationJobRepository(BaseRepository[GenerationJob]):
                 .selectinload(AIModel.provider),
             )
             .where(GenerationJob.provider_task_id == provider_task_id)
+            .with_for_update()
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

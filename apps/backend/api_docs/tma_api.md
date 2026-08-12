@@ -713,6 +713,11 @@ await fetch(upload_url, {
 | `POST` | `/webhook/kie/{secret}` | KIE callback mode |
 | `POST` | `/webhook/yookassa` | YooKassa payment notifications |
 
+KIE callback additionally requires `X-Webhook-Timestamp` and
+`X-Webhook-Signature`. Backend verifies the KIE HMAC-SHA256 signature and rejects
+callbacks older than the configured window. Terminal callback processing is
+idempotent; a periodic KIE status reconciliation handles missed callbacks.
+
 ## Minimal Frontend Data Flow
 
 ### App bootstrap

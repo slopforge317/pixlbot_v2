@@ -17,12 +17,13 @@ from db.repositories.user import UserRepository
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from loguru import logger
 from services.generation import process_generation
+from services.storage.service import is_user_object_key, is_valid_object_key
 
 router = APIRouter(prefix="/api", tags=["generations"])
 
 
 def _validate_input_against_model(
-    input_data: dict[str, object], model: AIModel
+    input_data: dict[str, object], model: AIModel, user_id: int
 ) -> None:
     """Validate prompt and reference limits from model input_schema."""
     prompt_spec = model.input_schema.get("prompt", {})
@@ -56,6 +57,17 @@ def _validate_input_against_model(
                 status_code=422,
                 detail=f"{field_name} must be an array",
             )
+
+        for item in value:
+            if (
+                isinstance(item, str)
+                and is_valid_object_key(item)
+                and not is_user_object_key(item, user_id)
+            ):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{field_name} contains an object owned by another user",
+                )
 
         max_images = field_spec.get("max_images")
         if (
@@ -111,7 +123,7 @@ async def create_generation(
             detail="Selected model does not match pricing variant",
         )
 
-    _validate_input_against_model(request.input, model)
+    _validate_input_against_model(request.input, model, user.user_id)
 
     # 2. Price check (stale data protection)
     if request.variant.price != variant.price:

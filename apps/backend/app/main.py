@@ -11,6 +11,10 @@ from core.logging import setup_logging
 from fastapi import FastAPI
 from loguru import logger
 from services.funnel import funnel_message_loop, seed_funnel_steps
+from services.generation import (
+    kie_reconciliation_loop,
+    validate_kie_callback_settings,
+)
 from services.payment import stale_payment_cleanup_loop
 
 
@@ -19,6 +23,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """FastAPI lifespan: startup and shutdown events."""
     setup_logging()
     logger.info("Starting pixlbot API...")
+    validate_kie_callback_settings()
 
     if settings.funnel_enabled:
         await seed_funnel_steps()
@@ -47,6 +52,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     else:
         logger.warning("Stale payment cleanup is disabled")
 
+    if settings.kie_callback_enabled:
+        app.state.kie_reconciliation_task = asyncio.create_task(
+            kie_reconciliation_loop()
+        )
+
     # Funnel messages require an active Telegram bot.
     if settings.telegram_bot_enabled and settings.funnel_enabled:
         app.state.funnel_task = asyncio.create_task(funnel_message_loop())
@@ -59,6 +69,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         stale_task.cancel()
         try:
             await stale_task
+        except asyncio.CancelledError:
+            pass
+
+    reconciliation_task = getattr(app.state, "kie_reconciliation_task", None)
+    if reconciliation_task:
+        reconciliation_task.cancel()
+        try:
+            await reconciliation_task
         except asyncio.CancelledError:
             pass
 

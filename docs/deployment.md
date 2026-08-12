@@ -22,7 +22,8 @@ nano .env.test
 ```
 
 Замените `BOT_TOKEN`, `POSTGRES_PASSWORD`, `WEBHOOK_SECRET`,
-`KIE_CALLBACK_SECRET` и Cloudflare R2 credentials. Для первого запуска оставьте:
+`KIE_CALLBACK_SECRET`, `KIE_WEBHOOK_HMAC_KEY` и Cloudflare R2 credentials.
+Для первого запуска оставьте:
 
 ```dotenv
 APP_DOMAIN=tma.pixlbot.ru
@@ -40,6 +41,25 @@ R2_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
 R2_REGION=auto
 R2_UPLOAD_MAX_SIZE_BYTES=31457280
 ```
+
+Для включения реальных генераций настройте KIE и перезапустите backend:
+
+```dotenv
+KIE_API_KEY=<KIE API key>
+WEBHOOK_BASE_URL=https://tma.pixlbot.ru
+KIE_CALLBACK_ENABLED=true
+KIE_CALLBACK_SECRET=<long URL-safe secret>
+KIE_WEBHOOK_HMAC_KEY=<webhookHmacKey from KIE settings>
+```
+
+Backend передаёт KIE полный callback URL
+`https://tma.pixlbot.ru/webhook/kie/<KIE_CALLBACK_SECRET>` при создании каждой
+задачи. Отдельный callback-домен не нужен. При включённом callback mode backend
+не запустится с пустым API key, base URL, callback secret или HMAC key.
+
+Завершённые callback jobs дополнительно сверяются через KIE API раз в минуту.
+Это fallback на случай недоставленного callback. Результат остаётся по URL KIE;
+backend не копирует его в R2.
 
 Для `POSTGRES_PASSWORD` используйте длинное значение только из латинских букв и
 цифр: Compose подставляет его также в URL подключения backend.

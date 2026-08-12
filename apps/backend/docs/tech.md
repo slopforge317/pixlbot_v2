@@ -47,6 +47,13 @@ Environment variables loaded via `pydantic-settings` from `.env` file:
 | `KIE_API_BASE_URL` | `https://api.kie.ai` | KIE API base URL |
 | `KIE_POLL_INTERVAL` | `3.0` | Seconds between status polls |
 | `KIE_POLL_TIMEOUT` | `300.0` | Max wait time for generation |
+| `KIE_CALLBACK_ENABLED` | `false` | Use per-task KIE callback instead of foreground polling |
+| `KIE_CALLBACK_SECRET` | — | URL-safe secret in callback path |
+| `KIE_WEBHOOK_HMAC_KEY` | — | KIE `webhookHmacKey` used for HMAC-SHA256 verification |
+| `KIE_WEBHOOK_MAX_AGE_SECONDS` | `300` | Maximum accepted callback timestamp age |
+| `KIE_RECONCILIATION_INTERVAL_SECONDS` | `60` | Missed-callback reconciliation interval |
+| `KIE_RECONCILIATION_STALE_SECONDS` | `60` | Minimum job age before reconciliation |
+| `KIE_RECONCILIATION_BATCH_SIZE` | `100` | Maximum jobs checked per reconciliation pass |
 
 ## Logging
 

@@ -137,6 +137,13 @@ def is_valid_object_key(object_key: str) -> bool:
     return bool(OBJECT_KEY_PATTERN.match(object_key))
 
 
+def is_user_object_key(object_key: str, user_id: int) -> bool:
+    """Check that a valid upload object key belongs to the expected user."""
+    return is_valid_object_key(object_key) and object_key.startswith(
+        f"uploads/{user_id}/"
+    )
+
+
 # Lazy singleton
 _storage_service: StorageService | None = None
 

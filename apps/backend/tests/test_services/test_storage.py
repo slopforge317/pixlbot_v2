@@ -7,6 +7,7 @@ from services.storage import service as storage_module
 from services.storage.service import (
     StorageService,
     get_storage_service,
+    is_user_object_key,
     is_valid_object_key,
 )
 
@@ -68,6 +69,12 @@ class TestObjectKeyPattern:
         ]
         for key in invalid_keys:
             assert not is_valid_object_key(key), f"Should be invalid: {key}"
+
+    def test_key_must_belong_to_user(self) -> None:
+        key = "uploads/42/550e8400-e29b-41d4-a716-446655440000.jpg"
+
+        assert is_user_object_key(key, 42)
+        assert not is_user_object_key(key, 41)
 
 
 class TestGetStorageService:
@@ -274,7 +281,7 @@ class TestReplaceObjectKeysWithUrls:
             "services.storage.get_storage_service",
             return_value=mock_storage,
         ):
-            result = _replace_object_keys_with_urls(input_data)
+            result = _replace_object_keys_with_urls(input_data, user_id=1)
 
         assert result["prompt"] == "test"
         assert result["image_input"] == [
@@ -301,7 +308,7 @@ class TestReplaceObjectKeysWithUrls:
             "services.storage.get_storage_service",
             return_value=mock_storage,
         ):
-            result = _replace_object_keys_with_urls(input_data)
+            result = _replace_object_keys_with_urls(input_data, user_id=1)
 
         # Base64 URIs don't match OBJECT_KEY_PATTERN, so they pass through
         assert result["image_input"] == [
@@ -325,7 +332,7 @@ class TestReplaceObjectKeysWithUrls:
             "services.storage.get_storage_service",
             return_value=mock_storage,
         ):
-            result = _replace_object_keys_with_urls(input_data)
+            result = _replace_object_keys_with_urls(input_data, user_id=1)
 
         assert result == input_data
         mock_storage.generate_presigned_get_url.assert_not_called()
@@ -347,8 +354,20 @@ class TestReplaceObjectKeysWithUrls:
             "services.storage.get_storage_service",
             return_value=mock_storage,
         ):
-            result = _replace_object_keys_with_urls(input_data)
+            result = _replace_object_keys_with_urls(input_data, user_id=1)
 
         # Mixed list: not all items match, so nothing is replaced
         assert result["image_input"] == input_data["image_input"]
         mock_storage.generate_presigned_get_url.assert_not_called()
+
+    def test_rejects_another_users_object_key(self) -> None:
+        from app.services.generation import _replace_object_keys_with_urls
+
+        input_data = {
+            "image_input": [
+                "uploads/2/550e8400-e29b-41d4-a716-446655440000.jpg",
+            ],
+        }
+
+        with pytest.raises(ValueError, match="another user"):
+            _replace_object_keys_with_urls(input_data, user_id=1)

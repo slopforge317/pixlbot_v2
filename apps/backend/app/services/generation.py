@@ -8,9 +8,11 @@ Handles the full generation lifecycle:
 5. Refund credits on error
 """
 
+import asyncio
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 from bot import create_bot
 from bot.texts import GENERATION_SUCCESS
@@ -40,7 +42,7 @@ from services.notification import (
     send_generation_result,
     send_generation_timeout,
 )
-from services.storage.service import is_valid_object_key
+from services.storage.service import is_user_object_key, is_valid_object_key
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -55,6 +57,55 @@ class GenerationContext:
     provider: Provider
     api_model_id: str
     media_type: str  # "image" or "video"
+
+
+def build_kie_callback_url() -> str:
+    """Build a validated public callback URL for KIE."""
+    required = {
+        "KIE_API_KEY": settings.kie_api_key,
+        "WEBHOOK_BASE_URL": settings.webhook_base_url,
+        "KIE_CALLBACK_SECRET": settings.kie_callback_secret,
+        "KIE_WEBHOOK_HMAC_KEY": settings.kie_webhook_hmac_key,
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        raise RuntimeError(
+            "KIE callback mode is not configured. Missing: " + ", ".join(missing)
+        )
+
+    base_url = settings.webhook_base_url.rstrip("/")
+    parsed = urlparse(base_url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.path not in ("", "/")
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError("WEBHOOK_BASE_URL must be an HTTPS origin without a path")
+
+    positive_settings = {
+        "KIE_WEBHOOK_MAX_AGE_SECONDS": settings.kie_webhook_max_age_seconds,
+        "KIE_RECONCILIATION_INTERVAL_SECONDS": (
+            settings.kie_reconciliation_interval_seconds
+        ),
+        "KIE_RECONCILIATION_STALE_SECONDS": settings.kie_reconciliation_stale_seconds,
+        "KIE_RECONCILIATION_BATCH_SIZE": settings.kie_reconciliation_batch_size,
+    }
+    invalid = [name for name, value in positive_settings.items() if value <= 0]
+    if invalid:
+        raise RuntimeError(
+            "KIE callback settings must be positive: " + ", ".join(invalid)
+        )
+
+    return f"{base_url}/webhook/kie/{settings.kie_callback_secret}"
+
+
+def validate_kie_callback_settings() -> None:
+    """Fail during startup instead of creating callback jobs that can never finish."""
+    if settings.kie_callback_enabled:
+        build_kie_callback_url()
 
 
 async def process_generation(job_id: int) -> None:
@@ -214,7 +265,9 @@ def _build_context(
     )
 
 
-def _replace_object_keys_with_urls(input_data: dict[str, Any]) -> dict[str, Any]:
+def _replace_object_keys_with_urls(
+    input_data: dict[str, Any], user_id: int
+) -> dict[str, Any]:
     """Replace R2 object keys with presigned GET URLs in input data.
 
     Scans input_data values; if a value is a list[str] where all items
@@ -229,8 +282,6 @@ def _replace_object_keys_with_urls(input_data: dict[str, Any]) -> dict[str, Any]
     """
     from services.storage import get_storage_service
 
-    storage = get_storage_service()
-
     for key, value in input_data.items():
         if not isinstance(value, list):
             continue
@@ -241,7 +292,11 @@ def _replace_object_keys_with_urls(input_data: dict[str, Any]) -> dict[str, Any]
         if not all(is_valid_object_key(item) for item in value):
             continue
 
+        if not all(is_user_object_key(item, user_id) for item in value):
+            raise ValueError("Reference image belongs to another user")
+
         # All items are valid object keys — replace with presigned GET URLs
+        storage = get_storage_service()
         input_data[key] = [
             storage.generate_presigned_get_url(obj_key) for obj_key in value
         ]
@@ -277,19 +332,14 @@ async def _execute_generation(
     # Ensure prompt from DB column (authoritative)
     input_data["prompt"] = job.prompt
 
-    # Replace R2 object keys with presigned GET URLs
-    try:
-        input_data = _replace_object_keys_with_urls(input_data)
-    except Exception as e:
-        logger.warning(f"Failed to replace object keys with URLs: {e}")
+    # Replace R2 object keys with presigned GET URLs. Any signing error must abort
+    # the task; sending a private object key to KIE would create a doomed job.
+    input_data = _replace_object_keys_with_urls(input_data, ctx.user.user_id)
 
     # 5. Build callback URL if callback mode is enabled
     callback_url = None
-    if settings.kie_callback_enabled and settings.webhook_base_url:
-        callback_url = (
-            f"{settings.webhook_base_url}/webhook/kie/"
-            f"{settings.kie_callback_secret}"
-        )
+    if settings.kie_callback_enabled:
+        callback_url = build_kie_callback_url()
 
     # 6. Create task in KIE API
     task_id = await kie_service.create_generation(
@@ -304,7 +354,7 @@ async def _execute_generation(
     logger.info(f"KIE task created: kie_task_id={task_id}, model={ctx.api_model_id}")
 
     # 8. In callback mode, return immediately — result comes via webhook
-    if settings.kie_callback_enabled:
+    if callback_url:
         logger.info(f"Callback mode: task_id={task_id}, awaiting webhook")
         return
 
@@ -333,11 +383,14 @@ async def _handle_success(
         result: Generation result from KIE
         media_type: "image" or "video"
     """
+    if not result.result_urls:
+        raise ValueError("KIE returned no result URLs")
+
+    result_url = result.result_urls[0]
     job.status = JobStatus.done
     job.provider_complete_time = datetime.now(UTC).replace(tzinfo=None)
-
-    if result.result_urls:
-        job.success_url_asset = result.result_urls[0]
+    job.provider_consume_credit = result.credits_consumed or 0
+    job.success_url_asset = result_url
 
     await session.commit()
     logger.info("Generation completed successfully")
@@ -361,19 +414,18 @@ async def _handle_success(
     except Exception:
         logger.exception("Failed to fire first_generation_done funnel trigger")
 
-    if job.success_url_asset:
-        is_video = media_type == "video"
-        file_id = await send_generation_result(
-            bot=bot,
-            chat_id=user.chat_id,
-            result_url=job.success_url_asset,
-            is_video=is_video,
-            caption=GENERATION_SUCCESS,
-        )
+    is_video = media_type == "video"
+    file_id = await send_generation_result(
+        bot=bot,
+        chat_id=user.chat_id,
+        result_url=result_url,
+        is_video=is_video,
+        caption=GENERATION_SUCCESS,
+    )
 
-        if file_id:
-            job.telegram_file_id = file_id
-            await session.commit()
+    if file_id:
+        job.telegram_file_id = file_id
+        await session.commit()
 
 
 async def _handle_error(
@@ -394,12 +446,10 @@ async def _handle_error(
         tx_repo: Transaction repository
         error_message: Human-readable error description
     """
-    # Update job status
+    # Status and refund are one transaction. This keeps retries idempotent even
+    # if the process stops between updating the job and writing the ledger row.
     job.status = JobStatus.error
     job.error = error_message
-    await session.commit()
-
-    # Refund credits
     await tx_repo.create_refund(
         user_id=user.user_id,
         amount_credits=job.cost_credit,
@@ -436,12 +486,9 @@ async def _handle_timeout(
         bot: Telegram bot instance
         tx_repo: Transaction repository
     """
-    # Update job status
+    # Status and refund are one transaction.
     job.status = JobStatus.error
     job.error = "Generation timed out"
-    await session.commit()
-
-    # Refund credits
     await tx_repo.create_refund(
         user_id=user.user_id,
         amount_credits=job.cost_credit,
@@ -478,51 +525,114 @@ async def process_kie_result(task_id: str, task_status: TaskStatusData) -> None:
     async with get_session() as session:
         bot = create_bot()
         try:
-            job_repo = GenerationJobRepository(session)
-            tx_repo = TransactionRepository(session)
-
-            job = await job_repo.get_by_provider_task_id_for_processing(task_id)
-            if not job:
-                logger.error(f"Job not found for provider_task_id={task_id}")
-                return
-
-            set_job_id(job.job_id)
-
-            # Idempotency: skip if already in terminal state
-            if job.status in (JobStatus.done, JobStatus.error):
-                logger.warning(
-                    f"Job already in terminal state: {job.status.value}, skipping"
-                )
-                return
-
-            user = job.user
-            if not user:
-                logger.error("Job has no associated user")
-                return
-
-            variant = job.pricing_variant
-            if not variant or not variant.model or not variant.model.provider:
-                logger.error("Job missing required relationships")
-                await _handle_error(
-                    session,
-                    job,
-                    user,
-                    bot,
-                    tx_repo,
-                    "Configuration error: missing relationships",
-                )
-                return
-
-            media_type = variant.model.provider.gen_type
-
-            if task_status.state.is_success():
-                result = GenerationResult.from_task_status(task_status)
-                await _handle_success(session, job, user, bot, result, media_type)
-            else:
-                error_msg = task_status.failMsg or "Generation failed"
-                await _handle_error(session, job, user, bot, tx_repo, error_msg)
+            await _process_kie_result_impl(task_id, task_status, session, bot)
         except Exception as e:
             logger.exception(f"Error processing KIE callback: {e}")
         finally:
             await bot.session.close()
             set_job_id(None)
+
+
+async def _process_kie_result_impl(
+    task_id: str,
+    task_status: TaskStatusData,
+    session: AsyncSession,
+    bot: Any,
+) -> None:
+    """Apply a terminal KIE status while holding a row lock."""
+    job_repo = GenerationJobRepository(session)
+    tx_repo = TransactionRepository(session)
+
+    job = await job_repo.get_by_provider_task_id_for_processing(task_id)
+    if not job:
+        logger.error(f"Job not found for provider_task_id={task_id}")
+        return
+
+    set_job_id(job.job_id)
+
+    if job.status in (JobStatus.done, JobStatus.error):
+        logger.warning(f"Job already in terminal state: {job.status.value}, skipping")
+        return
+
+    user = job.user
+    if not user:
+        logger.error("Job has no associated user")
+        return
+
+    variant = job.pricing_variant
+    if not variant or not variant.model or not variant.model.provider:
+        logger.error("Job missing required relationships")
+        await _handle_error(
+            session,
+            job,
+            user,
+            bot,
+            tx_repo,
+            "Configuration error: missing relationships",
+        )
+        return
+
+    job.provider_consume_credit = task_status.creditsConsumed or 0
+    media_type = variant.model.provider.gen_type
+
+    if task_status.state.is_success():
+        result = GenerationResult.from_task_status(task_status)
+        if not result.result_urls:
+            await _handle_error(
+                session,
+                job,
+                user,
+                bot,
+                tx_repo,
+                "KIE returned no result URLs",
+            )
+            return
+        await _handle_success(session, job, user, bot, result, media_type)
+    else:
+        error_msg = task_status.failMsg or "Generation failed"
+        await _handle_error(session, job, user, bot, tx_repo, error_msg)
+
+
+async def reconcile_kie_generations() -> None:
+    """Poll terminal state for callback jobs whose webhook may have been missed."""
+    older_than = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        seconds=settings.kie_reconciliation_stale_seconds
+    )
+    async with get_session() as session:
+        jobs = await GenerationJobRepository(
+            session
+        ).get_processing_jobs_for_reconciliation(
+            older_than=older_than,
+            limit=settings.kie_reconciliation_batch_size,
+        )
+        task_ids = [job.provider_task_id for job in jobs if job.provider_task_id]
+
+    if not task_ids:
+        return
+
+    logger.info(f"Reconciling {len(task_ids)} KIE generation job(s)")
+    async with KieClient(
+        api_key=settings.kie_api_key,
+        base_url=settings.kie_api_base_url,
+    ) as client:
+        service = KieService(client=client)
+        for task_id in task_ids:
+            try:
+                status = await service.get_task_status(task_id)
+                if status and status.state.is_terminal():
+                    await process_kie_result(task_id, status)
+            except Exception:
+                logger.exception(f"Failed to reconcile KIE task: task_id={task_id}")
+
+
+async def kie_reconciliation_loop() -> None:
+    """Periodically reconcile KIE jobs while callback mode is active."""
+    interval = settings.kie_reconciliation_interval_seconds
+    logger.info(f"KIE reconciliation loop started: interval={interval}s")
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            await reconcile_kie_generations()
+    except asyncio.CancelledError:
+        logger.info("KIE reconciliation loop stopped")
+        raise

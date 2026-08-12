@@ -1,12 +1,18 @@
 """Webhook endpoints for Telegram, KIE callbacks, and YooKassa."""
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import ipaddress
+import time
+from typing import Any
 
 from aiogram.types import Update
 from core.config import settings
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 from loguru import logger
+from pydantic import ValidationError
 from services.generation import process_kie_result
 from services.kie.schemas import TaskStatusResponse
 from services.payment import process_yookassa_notification
@@ -87,28 +93,93 @@ async def telegram_webhook(
     return {"ok": True}
 
 
+def _verify_kie_signature(
+    task_id: str,
+    timestamp: str | None,
+    signature: str | None,
+) -> None:
+    """Verify KIE HMAC signature and reject stale callback requests."""
+    if not settings.kie_webhook_hmac_key:
+        logger.error("KIE webhook HMAC key is not configured")
+        raise HTTPException(status_code=503, detail="Callback is not configured")
+
+    if not timestamp or not signature:
+        raise HTTPException(status_code=403, detail="Missing webhook signature")
+
+    try:
+        timestamp_seconds = int(timestamp)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=403, detail="Invalid webhook timestamp"
+        ) from exc
+
+    if abs(int(time.time()) - timestamp_seconds) > settings.kie_webhook_max_age_seconds:
+        raise HTTPException(status_code=403, detail="Stale webhook timestamp")
+
+    message = f"{task_id}.{timestamp}".encode()
+    digest = hmac.new(
+        settings.kie_webhook_hmac_key.encode(),
+        message,
+        hashlib.sha256,
+    ).digest()
+    expected_signature = base64.b64encode(digest).decode()
+    if not hmac.compare_digest(expected_signature, signature):
+        raise HTTPException(status_code=403, detail="Invalid webhook signature")
+
+
 @router.post("/webhook/kie/{secret}")
-async def kie_callback(secret: str, request: Request) -> dict[str, bool]:
+async def kie_callback(
+    secret: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_webhook_timestamp: str | None = Header(None),
+    x_webhook_signature: str | None = Header(None),
+) -> dict[str, bool]:
     """Handle KIE generation callback.
 
     KIE sends task results to this endpoint when callback mode is enabled.
     The secret path parameter prevents unauthorized access.
     """
-    if secret != settings.kie_callback_secret:
+    if not settings.kie_callback_secret or not hmac.compare_digest(
+        secret, settings.kie_callback_secret
+    ):
         logger.warning("Invalid KIE callback secret")
         raise HTTPException(status_code=403, detail="Invalid secret")
 
-    body = await request.json()
-    logger.debug(f"KIE callback payload: {body}")
+    try:
+        body: Any = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
 
-    response = TaskStatusResponse.model_validate(body)
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Invalid callback payload")
+
+    data = body.get("data")
+    task_id = data.get("taskId") if isinstance(data, dict) else None
+    if not isinstance(task_id, str) or not task_id:
+        raise HTTPException(status_code=400, detail="Missing taskId")
+
+    _verify_kie_signature(task_id, x_webhook_timestamp, x_webhook_signature)
+    logger.debug(f"KIE callback received: task_id={task_id}")
+
+    try:
+        response = TaskStatusResponse.model_validate(body)
+    except ValidationError as exc:
+        logger.warning(f"Invalid KIE callback payload: task_id={task_id}")
+        raise HTTPException(status_code=400, detail="Invalid callback payload") from exc
 
     if not response.data:
         logger.warning("KIE callback has no data")
         return {"ok": True}
 
-    task_id = response.data.taskId
-    asyncio.create_task(process_kie_result(task_id, response.data))
+    if not response.data.state.is_terminal():
+        logger.info(
+            f"Ignoring non-terminal KIE callback: "
+            f"task_id={task_id}, state={response.data.state.value}"
+        )
+        return {"ok": True}
+
+    background_tasks.add_task(process_kie_result, task_id, response.data)
 
     return {"ok": True}
 
