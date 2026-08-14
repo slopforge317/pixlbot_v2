@@ -65,17 +65,12 @@ class Settings(BaseSettings):
     r2_presign_upload_expires: int = 600  # 10 min for PUT
     r2_presign_download_expires: int = 3600  # 1 hour for GET
 
-    # YooKassa Payments
-    yookassa_shop_id: str = ""
-    yookassa_secret_key: str = ""
-    yookassa_return_url: str = ""
+    # Telegram Payments via YooKassa
+    yookassa_provider_token: str = ""
     yookassa_tax_system_code: int = 2  # 1=ОСН, 2=УСН доходы, 3=УСН доходы-расходы
     yookassa_vat_code: int = 1  # 1=без НДС
-
-    # Stale payment cleanup
-    payment_cleanup_enabled: bool = True
-    stale_payment_check_interval_seconds: int = 300  # 5 min
-    stale_payment_threshold_minutes: int = 15  # Pending older than this → stale
+    yookassa_payment_subject: str = "service"
+    yookassa_payment_mode: str = "full_payment"
 
     # Funnel messaging
     funnel_enabled: bool = True

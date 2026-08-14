@@ -31,12 +31,14 @@ tests/
 │   └── test_webhook.py           # Telegram webhook tests
 ├── test_bot/
 │   ├── conftest.py               # Bot fixtures
-│   └── test_handlers.py          # Bot command tests
+│   ├── test_handlers.py          # Bot command tests
+│   └── test_payments.py          # Invoice, checkout, and idempotency tests
 ├── test_db/
 │   ├── conftest.py               # DB-specific fixtures (db_session)
 │   ├── test_models.py            # ORM model tests
 │   └── test_repositories.py      # Repository tests
 └── test_services/
+    ├── test_payment.py            # YooKassa receipt payload unit test
     ├── test_auth/
     │   └── test_init_data.py     # InitData validation unit tests
     ├── test_generation.py        # Generation service tests (build_context, error handling)
@@ -76,14 +78,15 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 ### `client` (test_api/conftest.py)
 Creates httpx AsyncClient with FastAPI test app:
-1. Creates temp file SQLite database (not in-memory, for multi-connection support)
+1. Connects to the isolated PostgreSQL test database
 2. Creates all tables
 3. Creates FastAPI app via `create_app()`
 4. Overrides `get_db_session` dependency with test session maker
 5. Yields httpx AsyncClient with ASGITransport
-6. Cleans up temp file
+6. Drops all tables and disposes the engine
 
-**Important:** Uses `app.db.base.Base` and `app.db.models` imports to match production code paths.
+**Important:** Uses the same SQLAlchemy metadata and PostgreSQL dialect as
+production. Start the isolated database with the root `scripts/test.ps1`.
 
 ### `valid_init_data` / `expired_init_data` (test_api/conftest.py)
 Helper fixtures generating valid/expired Telegram InitData strings for testing authentication.
@@ -144,8 +147,15 @@ async def test_wait_for_result_polling(kie_service, mock_client):
         TaskStatusResponse(..., state=KieTaskState.success),
     ])
     result = await kie_service.wait_for_result("task_123")
-    assert mock_client.get_task_status.call_count == 3
+assert mock_client.get_task_status.call_count == 3
 ```
+
+### Telegram Payments Tests
+Payment tests use a real PostgreSQL test session and a mocked Telegram bot. They
+verify that invoice creation requests and forwards email to YooKassa, produces
+matching receipt totals, rejects checkout without email, marks invoice delivery
+errors as failed, and grants credits only once for duplicate
+`SuccessfulPayment` updates.
 
 ### Schema Tests
 Test Pydantic model validation:

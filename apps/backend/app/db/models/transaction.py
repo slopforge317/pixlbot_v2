@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from db.base import Base, TimestampMixin
 from db.enums import TransactionType
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import ForeignKey, Integer
+from sqlalchemy import ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -17,6 +17,9 @@ class Transaction(Base, TimestampMixin):
     """Транзакция кредитов (immutable ledger)."""
 
     __tablename__ = "transactions"
+    __table_args__ = (
+        UniqueConstraint("payment_id", name="uq_transactions_payment_id"),
+    )
 
     tx_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(

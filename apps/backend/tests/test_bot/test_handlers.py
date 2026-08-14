@@ -134,7 +134,7 @@ async def test_on_balance(
 
     await on_balance(mock_callback, db_session)
 
-    expected_text = BALANCE_MENU_TEXT.format(pro_gens=0, basic_gens=0)
+    expected_text = BALANCE_MENU_TEXT.format(credits=0, pro_gens=0, basic_gens=0)
     mock_callback.message.edit_text.assert_called_once_with(
         expected_text, reply_markup=ANY
     )
@@ -149,7 +149,7 @@ async def test_on_balance_unregistered_user(
     """Test menu:balance callback for unregistered user shows zero balance."""
     await on_balance(mock_callback, db_session)
 
-    expected_text = BALANCE_MENU_TEXT.format(pro_gens=0, basic_gens=0)
+    expected_text = BALANCE_MENU_TEXT.format(credits=0, pro_gens=0, basic_gens=0)
     mock_callback.message.edit_text.assert_called_once_with(
         expected_text, reply_markup=ANY
     )

@@ -13,6 +13,7 @@ import {
   InsufficientCreditsAPIError,
   UnauthorizedError,
   type FieldOptionValue,
+  type CreditPackage,
   type GenerationDetail,
   type JobStatus,
   type Provider,
@@ -70,6 +71,8 @@ type GenerationStatus = "idle" | "submitting" | "queued" | "error"
 type HistoryLoadStatus = "loading" | "success" | "error"
 type ResultAvailability = "loading" | "available" | "unavailable"
 type SendOriginalStatus = "idle" | "sending" | "sent" | "error"
+type PaymentLoadStatus = "loading" | "success" | "error"
+type PaymentSendStatus = "idle" | "sending" | "sent" | "error"
 
 function formatCreditPrice(price: number | null) {
   if (price === null) {
@@ -185,29 +188,10 @@ const historyStatusVariants: Record<JobStatus, "green" | "orange" | "red"> = {
   error: "red",
 }
 
-const paymentPackages = [
-  {
-    name: "Start",
-    description: "Стоимость 1 генерации Pro = 29,5руб. (-20%)",
-    includes: "20 Pro генераций или 50 Basic генераций",
-    price: "590 руб.",
-  },
-  {
-    name: "Pro",
-    description: "Стоимость 1 генерации Pro = 26,5руб. (-10%)",
-    includes: "60 Pro генераций или 150 Basic генераций",
-    price: "1590 руб.",
-  },
-  {
-    name: "Premier",
-    description: "Стоимость 1 генерации Pro = 23,5руб. (-20%)",
-    includes: "200 Pro генераций или 500 Basic генераций",
-    price: "4700 руб.",
-  },
-]
-
 export function PrototypePage() {
-  const [activeScreen, setActiveScreen] = useState<ScreenId>("generation")
+  const [activeScreen, setActiveScreen] = useState<ScreenId>(() =>
+    window.location.pathname.startsWith("/packages") ? "payment" : "generation",
+  )
   const [providers, setProviders] = useState<Provider[]>([])
   const [modelsLoadStatus, setModelsLoadStatus] = useState<ModelsLoadStatus>("idle")
   const [modelsError, setModelsError] = useState("")
@@ -1086,10 +1070,88 @@ function CopyIcon() {
 }
 
 function PaymentScreen() {
+  const [packages, setPackages] = useState<CreditPackage[]>([])
+  const [balance, setBalance] = useState<number | null>(null)
+  const [loadStatus, setLoadStatus] = useState<PaymentLoadStatus>("loading")
+  const [sendStatus, setSendStatus] = useState<PaymentSendStatus>("idle")
+  const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null)
+  const [error, setError] = useState("")
+
+  const loadPaymentScreen = useCallback(async () => {
+    setLoadStatus("loading")
+    setError("")
+    try {
+      const [packagesResponse, user] = await Promise.all([
+        api.getPackages(),
+        api.getMe(),
+      ])
+      setPackages(packagesResponse.packages)
+      setBalance(user.balance)
+      setLoadStatus("success")
+    } catch (loadError) {
+      setPackages([])
+      setBalance(null)
+      setLoadStatus("error")
+      setError(
+        loadError instanceof UnauthorizedError
+          ? "Откройте Mini App внутри Telegram."
+          : "Не удалось загрузить тарифы.",
+      )
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadPaymentScreen()
+  }, [loadPaymentScreen])
+
+  async function handleBuy(packageId: number) {
+    setSelectedPackageId(packageId)
+    setSendStatus("sending")
+    setError("")
+    try {
+      await api.createPayment({ credit_package_id: packageId })
+      setSendStatus("sent")
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.close()
+      }
+    } catch (paymentError) {
+      setSendStatus("error")
+      setError(
+        paymentError instanceof UnauthorizedError
+          ? "Откройте Mini App внутри Telegram."
+          : paymentError instanceof Error
+            ? paymentError.message
+            : "Не удалось отправить счёт в чат.",
+      )
+    }
+  }
+
+  if (loadStatus === "loading") {
+    return <p className="text-body-sm text-muted-foreground">Загружаем тарифы...</p>
+  }
+
   return (
     <section className="grid gap-12">
+      <SurfaceCard className="gap-4">
+        <p className="font-technical text-caption text-muted-foreground">
+          Текущий баланс
+        </p>
+        <p className="text-heading-sm font-semibold">
+          {balance === null ? "—" : `${balance} кредитов`}
+        </p>
+      </SurfaceCard>
+
+      {loadStatus === "error" ? (
+        <SurfaceCard>
+          <p className="text-caption text-red-600">{error}</p>
+          <Button onClick={() => void loadPaymentScreen()} type="button" variant="outline">
+            Повторить
+          </Button>
+        </SurfaceCard>
+      ) : null}
+
       <div className="grid gap-8">
-        {paymentPackages.map((item) => {
+        {packages.map((item) => {
           const card = (
             <SurfaceCard>
             <div className="flex items-start justify-between gap-12">
@@ -1100,16 +1162,23 @@ function PaymentScreen() {
                 </p>
               </div>
               <p className="whitespace-nowrap font-technical text-caption font-medium text-foreground">
-                {item.price}
+                {item.price_formatted}
               </p>
             </div>
 
-            <p className="text-body-sm text-foreground">
-              Пакет включает: {item.includes}
+            <p className="whitespace-pre-line text-body-sm text-foreground">
+              {item.description}
             </p>
 
-            <Button type="button" variant="action">
-              Купить
+            <Button
+              disabled={sendStatus === "sending"}
+              onClick={() => void handleBuy(item.id)}
+              type="button"
+              variant="action"
+            >
+              {sendStatus === "sending" && selectedPackageId === item.id
+                ? "Отправляем счёт..."
+                : "Купить"}
             </Button>
           </SurfaceCard>
           )
@@ -1129,6 +1198,12 @@ function PaymentScreen() {
           )
         })}
       </div>
+      {sendStatus === "sent" ? (
+        <p className="text-caption text-emerald-700">Счёт отправлен в чат.</p>
+      ) : null}
+      {sendStatus === "error" && error ? (
+        <p className="text-caption text-red-600">{error}</p>
+      ) : null}
     </section>
   )
 }

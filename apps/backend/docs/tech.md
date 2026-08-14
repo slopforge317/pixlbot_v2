@@ -54,6 +54,11 @@ Environment variables loaded via `pydantic-settings` from `.env` file:
 | `KIE_RECONCILIATION_INTERVAL_SECONDS` | `60` | Missed-callback reconciliation interval |
 | `KIE_RECONCILIATION_STALE_SECONDS` | `60` | Minimum job age before reconciliation |
 | `KIE_RECONCILIATION_BATCH_SIZE` | `100` | Maximum jobs checked per reconciliation pass |
+| `YOOKASSA_PROVIDER_TOKEN` | — | Telegram Payments provider token issued by BotFather |
+| `YOOKASSA_TAX_SYSTEM_CODE` | `2` | Tax system code for YooKassa receipt data |
+| `YOOKASSA_VAT_CODE` | `1` | VAT code for YooKassa receipt items |
+| `YOOKASSA_PAYMENT_SUBJECT` | `service` | Receipt payment subject |
+| `YOOKASSA_PAYMENT_MODE` | `full_payment` | Receipt payment mode |
 
 ## Logging
 
@@ -81,6 +86,17 @@ Environment variables loaded via `pydantic-settings` from `.env` file:
   - 20 requests / 10 seconds (task creation)
   - 10 requests / second (status polling)
 - **Result storage:** URLs valid for ~24 hours
+
+### Telegram Payments / YooKassa
+- BotFather connects the bot to the YooKassa test or live provider and issues
+  `YOOKASSA_PROVIDER_TOKEN`.
+- Backend sends `sendInvoice` with prices in kopecks, mandatory email collection,
+  and YooKassa `provider_data.receipt` fiscal attributes.
+- `PreCheckoutQuery` is answered within the Telegram Update flow; a
+  `SuccessfulPayment` stores both Telegram and YooKassa charge IDs and creates
+  one immutable deposit transaction.
+- Direct YooKassa REST API credentials and a separate YooKassa webhook are not
+  used for new payments.
 
 ## Tool Configuration
 

@@ -155,12 +155,11 @@ export interface CreditPackageListResponse {
 
 export interface CreatePaymentRequest {
   credit_package_id: number;
-  email: string;
 }
 
 export interface CreatePaymentResponse {
   payment_id: number;
-  confirmation_url: string;
+  invoice_message_id: number;
 }
 
 export interface PaymentStatusResponse {

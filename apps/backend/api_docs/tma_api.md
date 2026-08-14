@@ -557,7 +557,8 @@ Authorization: tma <initData>
 
 ## POST /api/payments
 
-Создает платеж YooKassa для выбранного credit package.
+Создаёт локальный платёж и отправляет Telegram invoice в чат текущего
+пользователя. Провайдер invoice — ЮKassa, подключённая к боту через BotFather.
 
 ### Request
 
@@ -569,8 +570,7 @@ Content-Type: application/json
 
 ```json
 {
-  "credit_package_id": 1,
-  "email": "user@example.com"
+  "credit_package_id": 1
 }
 ```
 
@@ -579,18 +579,19 @@ Content-Type: application/json
 ```json
 {
   "payment_id": 42,
-  "confirmation_url": "https://yoomoney.ru/checkout/payments/v2/contract?orderId=..."
+  "invoice_message_id": 1234
 }
 ```
 
 ### Frontend behavior
 
-Открыть `confirmation_url`:
+После ответа `200` invoice уже находится в чате с ботом. TMA показывает короткое
+подтверждение и вызывает `Telegram.WebApp.close()`. Email не передаётся из TMA:
+его обязательно запрашивает платёжная форма Telegram (`need_email=true`) и
+передаёт ЮKassa для чека (`send_email_to_provider=true`).
 
-- в Telegram Mini App: `window.Telegram.WebApp.openLink(confirmation_url)` или `openInvoice`, если checkout URL подходит под Telegram flow;
-- в обычном браузере: `window.open(confirmation_url, "_blank")`.
-
-После возврата из YooKassa можно проверять статус через `GET /api/payments/{payment_id}/status`.
+Статус при необходимости можно получить через
+`GET /api/payments/{payment_id}/status`.
 
 ### Errors
 
@@ -598,7 +599,7 @@ Content-Type: application/json
 | --- | --- |
 | `401` | Auth error |
 | `404` | Credit package not found |
-| `422` | Invalid email or request body |
+| `422` | Invalid request body |
 | `502` | Payment service unavailable |
 | `503` | Payments are not configured |
 
@@ -712,7 +713,10 @@ await fetch(upload_url, {
 | --- | --- | --- |
 | `POST` | `/webhook/telegram` | Telegram webhook mode |
 | `POST` | `/webhook/kie/{secret}` | KIE callback mode |
-| `POST` | `/webhook/yookassa` | YooKassa payment notifications |
+
+Платёжные события `PreCheckoutQuery` и `SuccessfulPayment` приходят внутри
+обычных Telegram Update через `/webhook/telegram` (либо polling в development).
+Отдельного webhook ЮKassa нет.
 
 KIE callback additionally requires `X-Webhook-Timestamp` and
 `X-Webhook-Signature`. Backend verifies the KIE HMAC-SHA256 signature and rejects
@@ -742,7 +746,10 @@ idempotent; a periodic KIE status reconciliation handles missed callbacks.
 ### Payment flow
 
 1. Load packages with `GET /api/packages`.
-2. User chooses package and enters email.
+2. User chooses package.
 3. Call `POST /api/payments`.
-4. Open `confirmation_url`.
-5. Check `GET /api/payments/{payment_id}/status` after return or by polling.
+4. After `200`, show that the invoice was sent and close TMA.
+5. User pays the invoice in the bot chat and enters a mandatory email in the
+   Telegram payment form.
+6. Backend validates `PreCheckoutQuery`; on `SuccessfulPayment`, it grants the
+   package credits exactly once and sends the updated balance.

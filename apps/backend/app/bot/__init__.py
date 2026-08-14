@@ -37,6 +37,7 @@ def create_dispatcher() -> Dispatcher:
     # Register middlewares
     dp.message.middleware(DbSessionMiddleware(async_session_maker))
     dp.callback_query.middleware(DbSessionMiddleware(async_session_maker))
+    dp.pre_checkout_query.middleware(DbSessionMiddleware(async_session_maker))
 
     # Register routers
     dp.include_router(setup_routers())

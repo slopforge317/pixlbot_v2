@@ -222,6 +222,7 @@ async def send_payment_success(
 
     text = PAYMENT_SUCCESS.format(
         credits=credits_added,
+        balance=new_balance,
         pro_gens=new_balance // 5,
         basic_gens=new_balance // 2,
     )

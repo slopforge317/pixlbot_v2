@@ -14,6 +14,12 @@ class TransactionRepository(BaseRepository[Transaction]):
 
     model = Transaction
 
+    async def get_by_payment_id(self, payment_id: int) -> Transaction | None:
+        """Return the single deposit transaction associated with a payment."""
+        stmt = select(Transaction).where(Transaction.payment_id == payment_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_user_transactions(
         self, user_id: int, limit: int = 50, offset: int = 0
     ) -> list[Transaction]:

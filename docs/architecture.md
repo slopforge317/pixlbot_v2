@@ -16,13 +16,14 @@ Telegram client / Browser
           +---- Telegram Bot API (polling)
           +---- KIE API (следующий этап)
           +---- Cloudflare R2 (user uploads)
-          +---- YooKassa (следующий этап)
+          +---- Telegram Payments ---- YooKassa
 ```
 
 - `apps/tma` собирается в Docker image, где Caddy обслуживает статические файлы,
   выполняет SPA fallback, проксирует backend и управляет TLS.
-- `apps/backend` содержит HTTP API и Telegram bot. Funnel и payment cleanup
-  workers на первом test-стенде отключены переменными окружения.
+- `apps/backend` содержит HTTP API и Telegram bot. Счета Telegram Payments
+  отправляются ботом, а `PreCheckoutQuery` и `SuccessfulPayment` обрабатываются
+  как обычные Telegram Update.
 - PostgreSQL доступен только внутри Compose network и через loopback host port.
 - Caddy хранит ACME state и сертификаты в persistent named volumes.
 - BotFather-бот использует обычный Telegram API и polling.
@@ -43,7 +44,8 @@ Telegram client / Browser
 - Generations используют FastAPI `BackgroundTasks`, а не устойчивую очередь.
 - Telegram polling и периодические задачи находятся в процессе API, поэтому
   backend пока запускается в одном экземпляре.
-- KIE callback и payments не проверяются на первом deployment этапе.
+- Реальные платежи требуют test/live provider token ЮKassa из BotFather и
+  проверки реквизитов чека для конкретной системы налогообложения.
 - Пользовательские изображения загружаются напрямую из TMA в приватный
   Cloudflare R2 bucket через presigned PUT URL. Backend передаёт KIE временные
   presigned GET URL; lifecycle удаляет объекты с prefix `uploads/` через 1 день.

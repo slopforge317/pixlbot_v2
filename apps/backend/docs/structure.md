@@ -105,7 +105,8 @@ app/
 - Responds to `/start` with Mini App button
 - Sends generated images/videos to user chat
 - Sends status notifications (success, error, payment)
-- No interactive UI — all UI in TMA
+- Shows balance and active package purchase buttons
+- Sends Telegram Payments invoices and handles checkout/success updates
 
 **Operating modes:**
 - **Webhook** (`WEBHOOK_ENABLED=true`): Integrated with FastAPI, single process (production)
@@ -138,8 +139,16 @@ app/
 | **payment_id** | Integer | PK | Payment ID |
 | **user_id** | Integer | FK | Reference to users |
 | `status` | Enum | Yes | pending/success/failed |
-| `amount_currency` | Integer | Yes | Amount in kopecks/cents |
+| `amount_currency` | Integer | Yes | Immutable amount snapshot in kopecks |
+| `credits_amount` | Integer | Nullable | Immutable credits snapshot for Telegram invoices |
+| `currency` | String(3) | Yes | Invoice currency (`RUB`) |
 | `details` | JSON | Yes | Provider metadata |
+| `credit_package_id` | Integer | FK, Nullable | Purchased package |
+| `invoice_payload` | String(128) | Unique, Nullable | Opaque Telegram invoice payload |
+| `telegram_payment_charge_id` | String(255) | Unique, Nullable | Telegram charge ID |
+| `provider_payment_charge_id` | String(255) | Unique, Nullable | YooKassa transaction ID |
+| `customer_email` | String(320) | Nullable | Email collected by Telegram for receipt |
+| `paid_at` | Timestamp | Nullable | Successful payment time |
 | `created_at` | Timestamp | Yes | Creation time |
 
 #### `credit_packages`
@@ -163,6 +172,9 @@ app/
 | `job_id` | Integer | FK, Nullable | Reference to generations_job |
 | `payment_id` | Integer | FK, Nullable | Reference to payments |
 | `credit_package_id` | Integer | FK, Nullable | Reference to credit_packages |
+
+`payment_id` has a unique constraint: a payment can create no more than one
+ledger transaction, which makes repeated Telegram success updates idempotent.
 
 #### `providers`
 | Field | Type | Required | Description |
@@ -340,6 +352,18 @@ Sends Telegram notifications to users:
 - `send_generation_error(bot, chat_id, error_message, credits_refunded)` — error notification
 - `send_generation_timeout(bot, chat_id, credits_refunded)` — timeout notification
 - `send_payment_success(bot, chat_id, credits_added, new_balance)` — payment notification
+
+### Payment Service (`app/services/payment.py`)
+
+Creates Telegram Payments invoices backed by YooKassa:
+- persists a pending payment with immutable price/credit snapshots and opaque payload;
+- sends `sendInvoice` with `need_email` and `send_email_to_provider`;
+- builds `provider_data.receipt` from server-side fiscal settings;
+- marks the local payment failed if Telegram cannot deliver the invoice.
+
+The aiogram payment router validates amount, currency, owner, state, and email in
+`PreCheckoutQuery`. `SuccessfulPayment` locks the payment row, records Telegram
+and YooKassa charge IDs, and creates exactly one deposit transaction.
 
 ## Repositories
 

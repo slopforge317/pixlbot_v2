@@ -12,9 +12,16 @@ class PaymentRepository(BaseRepository[Payment]):
 
     model = Payment
 
-    async def get_by_yookassa_id(self, yookassa_payment_id: str) -> Payment | None:
-        """Find payment by YooKassa payment ID."""
-        stmt = select(Payment).where(Payment.yookassa_payment_id == yookassa_payment_id)
+    async def get_by_invoice_payload(
+        self,
+        invoice_payload: str,
+        *,
+        for_update: bool = False,
+    ) -> Payment | None:
+        """Find a Telegram invoice payment by its opaque payload."""
+        stmt = select(Payment).where(Payment.invoice_payload == invoice_payload)
+        if for_update:
+            stmt = stmt.with_for_update()
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -23,38 +30,41 @@ class PaymentRepository(BaseRepository[Payment]):
         user_id: int,
         amount_currency: int,
         credit_package_id: int,
-        yookassa_payment_id: str | None = None,
+        credits_amount: int,
+        invoice_payload: str,
+        currency: str = "RUB",
     ) -> Payment:
-        """Create a pending payment."""
+        """Create a pending Telegram invoice payment with immutable snapshots."""
         return await self.create(
             user_id=user_id,
             amount_currency=amount_currency,
+            credits_amount=credits_amount,
+            currency=currency,
             credit_package_id=credit_package_id,
             status=PaymentStatus.pending,
-            yookassa_payment_id=yookassa_payment_id,
+            invoice_payload=invoice_payload,
         )
 
-    async def mark_success(self, payment: Payment, details: dict[str, Any]) -> Payment:
-        """Mark payment as successful."""
-        return await self.update(payment, status=PaymentStatus.success, details=details)
+    async def mark_success(
+        self,
+        payment: Payment,
+        *,
+        telegram_payment_charge_id: str,
+        provider_payment_charge_id: str,
+        customer_email: str,
+        details: dict[str, Any],
+    ) -> Payment:
+        """Mark a Telegram payment as successful."""
+        return await self.update(
+            payment,
+            status=PaymentStatus.success,
+            telegram_payment_charge_id=telegram_payment_charge_id,
+            provider_payment_charge_id=provider_payment_charge_id,
+            customer_email=customer_email,
+            paid_at=datetime.utcnow(),
+            details=details,
+        )
 
     async def mark_failed(self, payment: Payment, details: dict[str, Any]) -> Payment:
         """Mark payment as failed."""
         return await self.update(payment, status=PaymentStatus.failed, details=details)
-
-    async def get_stale_pending(
-        self, older_than: datetime, limit: int = 50
-    ) -> list[Payment]:
-        """Find pending payments older than given time with a YooKassa ID."""
-        stmt = (
-            select(Payment)
-            .where(
-                Payment.status == PaymentStatus.pending,
-                Payment.created_at < older_than,
-                Payment.yookassa_payment_id.isnot(None),
-            )
-            .order_by(Payment.created_at.asc())
-            .limit(limit)
-        )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())

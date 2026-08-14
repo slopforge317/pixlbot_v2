@@ -33,7 +33,6 @@ TELEGRAM_BOT_ENABLED=true
 TELEGRAM_TEST_MODE=false
 WEBHOOK_ENABLED=false
 FUNNEL_ENABLED=false
-PAYMENT_CLEANUP_ENABLED=false
 R2_ACCESS_KEY_ID=<Access Key ID>
 R2_SECRET_ACCESS_KEY=<Secret Access Key>
 R2_BUCKET_NAME=<bucket name>
@@ -51,6 +50,23 @@ KIE_CALLBACK_ENABLED=true
 KIE_CALLBACK_SECRET=<long URL-safe secret>
 KIE_WEBHOOK_HMAC_KEY=<webhookHmacKey from KIE settings>
 ```
+
+Для тестирования Telegram Payments подключите ЮKassa к test-боту через
+BotFather → Bot Settings → Payments и добавьте выданный provider token только в
+server environment:
+
+```dotenv
+YOOKASSA_PROVIDER_TOKEN=<test provider token from BotFather>
+YOOKASSA_TAX_SYSTEM_CODE=2
+YOOKASSA_VAT_CODE=1
+YOOKASSA_PAYMENT_SUBJECT=service
+YOOKASSA_PAYMENT_MODE=full_payment
+```
+
+Backend не использует Shop ID, secret key, redirect URL или отдельный webhook
+ЮKassa. События оплаты приходят как Telegram `PreCheckoutQuery` и
+`SuccessfulPayment`. До production значения реквизитов чека нужно сверить с
+настройками магазина и бухгалтером.
 
 Backend передаёт KIE полный callback URL
 `https://tma.pixlbot.ru/webhook/kie/<KIE_CALLBACK_SECRET>` при создании каждой

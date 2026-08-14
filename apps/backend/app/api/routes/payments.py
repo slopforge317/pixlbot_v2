@@ -1,17 +1,20 @@
-"""Payment API endpoints."""
+"""Telegram Payments endpoints for the Mini App."""
 
+from aiogram import Bot
 from api.deps import CurrentUser, DBSession
 from api.schemas.payment import (
     CreatePaymentRequest,
     CreatePaymentResponse,
     PaymentStatusResponse,
 )
-from core.config import settings
 from db.models.credit_package import CreditPackage
 from db.repositories.payment import PaymentRepository
-from fastapi import APIRouter, HTTPException
-from loguru import logger
-from services.payment import create_yookassa_payment
+from fastapi import APIRouter, HTTPException, Request
+from services.payment import (
+    PaymentConfigurationError,
+    PaymentInvoiceError,
+    send_package_invoice,
+)
 
 router = APIRouter(prefix="/api", tags=["payments"])
 
@@ -21,66 +24,34 @@ async def create_payment(
     body: CreatePaymentRequest,
     user: CurrentUser,
     session: DBSession,
+    request: Request,
 ) -> CreatePaymentResponse:
-    """Create a payment for a credit package.
-
-    1. Validates the credit package exists and is active
-    2. Creates a pending Payment record
-    3. Creates a YooKassa payment
-    4. Returns the confirmation URL for redirect
-    """
-    # Validate credit package
-    credit_package = await session.get(CreditPackage, body.credit_package_id)
-    if not credit_package or not credit_package.is_active:
+    """Send a YooKassa-backed Telegram invoice to the current user's chat."""
+    package = await session.get(CreditPackage, body.credit_package_id)
+    if not package or not package.is_active:
         raise HTTPException(status_code=404, detail="Credit package not found")
 
-    if not settings.yookassa_shop_id:
-        raise HTTPException(status_code=503, detail="Payments are not configured")
+    bot = getattr(request.app.state, "bot", None)
+    if not isinstance(bot, Bot):
+        raise HTTPException(status_code=503, detail="Telegram bot is not available")
 
-    # Create pending payment in DB
-    payment_repo = PaymentRepository(session)
-    payment = await payment_repo.create_pending(
-        user_id=user.user_id,
-        amount_currency=credit_package.fiat_price,
-        credit_package_id=credit_package.id,
-    )
-
-    logger.info(
-        f"Payment created: payment_id={payment.payment_id}, "
-        f"user_id={user.user_id}, package_id={credit_package.id}"
-    )
-
-    # Create YooKassa payment
     try:
-        # Build return URL with payment_id for status checking
-        separator = "&" if "?" in settings.yookassa_return_url else "?"
-        return_url = (
-            f"{settings.yookassa_return_url}{separator}payment_id={payment.payment_id}"
+        invoice = await send_package_invoice(
+            bot=bot,
+            session=session,
+            user=user,
+            package=package,
         )
-
-        yookassa_id, confirmation_url = await create_yookassa_payment(
-            amount_kopeks=credit_package.fiat_price,
-            description=f"Пополнение баланса: {credit_package.name}",
-            return_url=return_url,
-            metadata={"payment_id": str(payment.payment_id)},
-            email=body.email,
-            idempotency_key=str(payment.payment_id),
-        )
-    except Exception as e:
-        logger.error(f"YooKassa payment creation failed: {e}")
-        raise HTTPException(status_code=502, detail="Payment service unavailable")
-
-    # Update payment with YooKassa ID
-    await payment_repo.update(payment, yookassa_payment_id=yookassa_id)
-
-    logger.info(
-        f"YooKassa payment linked: payment_id={payment.payment_id}, "
-        f"yookassa_id={yookassa_id}"
-    )
+    except PaymentConfigurationError as exc:
+        raise HTTPException(
+            status_code=503, detail="Payments are not configured"
+        ) from exc
+    except PaymentInvoiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return CreatePaymentResponse(
-        payment_id=payment.payment_id,
-        confirmation_url=confirmation_url,
+        payment_id=invoice.payment_id,
+        invoice_message_id=invoice.message_id,
     )
 
 
@@ -90,9 +61,8 @@ async def get_payment_status(
     user: CurrentUser,
     session: DBSession,
 ) -> PaymentStatusResponse:
-    """Check payment status. Only the payment owner can check."""
-    payment_repo = PaymentRepository(session)
-    payment = await payment_repo.get_by_id(payment_id)
+    """Return the local status of a payment owned by the current user."""
+    payment = await PaymentRepository(session).get_by_id(payment_id)
     if not payment or payment.user_id != user.user_id:
         raise HTTPException(status_code=404, detail="Payment not found")
 

@@ -15,7 +15,6 @@ from services.generation import (
     kie_reconciliation_loop,
     validate_kie_callback_settings,
 )
-from services.payment import stale_payment_cleanup_loop
 
 
 @asynccontextmanager
@@ -46,12 +45,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.polling_task = asyncio.create_task(dp.start_polling(bot))
         logger.info("Bot running in polling mode")
 
-    # Start stale payment cleanup background task
-    if settings.payment_cleanup_enabled:
-        app.state.stale_payment_task = asyncio.create_task(stale_payment_cleanup_loop())
-    else:
-        logger.warning("Stale payment cleanup is disabled")
-
     if settings.kie_callback_enabled:
         app.state.kie_reconciliation_task = asyncio.create_task(
             kie_reconciliation_loop()
@@ -62,15 +55,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.funnel_task = asyncio.create_task(funnel_message_loop())
 
     yield
-
-    # Stop stale payment cleanup
-    stale_task = getattr(app.state, "stale_payment_task", None)
-    if stale_task:
-        stale_task.cancel()
-        try:
-            await stale_task
-        except asyncio.CancelledError:
-            pass
 
     reconciliation_task = getattr(app.state, "kie_reconciliation_task", None)
     if reconciliation_task:

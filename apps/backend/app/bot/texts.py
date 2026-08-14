@@ -23,7 +23,10 @@ Pro — <b>{pro_gens}</b> · Basic — <b>{basic_gens}</b>"""
 MENU_TEXT = "Выбери действие:"
 
 BALANCE_MENU_TEXT = (
-    "💰 Доступно генераций:\n" "Pro — <b>{pro_gens}</b>\n" "Basic — <b>{basic_gens}</b>"
+    "💰 Баланс: <b>{credits} кредитов</b>\n\n"
+    "Доступно генераций:\n"
+    "Pro — <b>{pro_gens}</b>\n"
+    "Basic — <b>{basic_gens}</b>"
 )
 
 COMING_SOON = "Эта функция скоро появится!"
@@ -46,6 +49,7 @@ GENERATION_TIMEOUT = (
 PAYMENT_SUCCESS = (
     "Оплата прошла успешно!\n\n"
     "Начислено кредитов: {credits}\n\n"
+    "Баланс: {balance} кредитов\n"
     "Доступно генераций:\n"
     "Pro — {pro_gens} · Basic — {basic_gens}"
 )

@@ -52,7 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(payments_router)
     app.include_router(storage_router)
 
-    # Webhook router: always include (YooKassa needs it even without Telegram webhooks)
+    # Webhook router: Telegram and KIE callbacks.
     app.include_router(webhook_router)
 
     return app

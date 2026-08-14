@@ -19,11 +19,12 @@ All user interactions happen in the Mini App:
 - Credit balance and purchase
 - Account settings
 
-### Telegram Bot — Notifications Only
-The bot serves as a delivery channel:
+### Telegram Bot — Delivery and Payments
+The bot serves as a delivery and payment channel:
 - Sends ready images/videos to chat
 - Notifies about generation status (success/error)
-- Payment confirmations
+- Shows the current balance and package purchase buttons
+- Sends Telegram invoices and payment confirmations
 - `/start` command opens the Mini App
 
 ## Features
@@ -40,7 +41,8 @@ The bot serves as a delivery channel:
 - **Parameters:** Aspect ratio, quality/size, duration, sound
 
 ### Credit System
-- Users purchase credit packages (in TMA)
+- Users select credit packages in TMA or the bot balance menu
+- Telegram Payments collects mandatory email and processes payment through YooKassa
 - Each generation costs credits (varies by model/mode)
 - Balance calculated from transaction history (immutable ledger)
 - Refunds on generation errors
@@ -50,7 +52,8 @@ The bot serves as a delivery channel:
 2. In TMA: select model, enter prompt, configure parameters
 3. Submit generation request
 4. Bot sends notification when ready + result media
-5. User can view history, balance, buy credits — all in TMA
+5. User can view history and balance in TMA; package selection sends an invoice
+   to the bot chat and closes TMA
 
 ## Monetization
 
@@ -98,8 +101,8 @@ Predefined packages with:
 - [x] `GET /api/generations/{id}` endpoint (generation details)
 - [x] Generation service (balance check, credit deduction, KIE integration, refunds)
 - [x] Bot notifications (generation ready, errors, timeouts)
+- [x] Telegram Payments via YooKassa with receipt email and idempotent credit grant
 - [x] Seed data for 7 AI models (3 video + 4 image) with full api_config
 
 ### Planned
-- [ ] TMA frontend (separate project)
-- [ ] Payment integration
+- [ ] Complete remaining TMA screens and production UX polish

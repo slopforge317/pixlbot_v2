@@ -1,10 +1,8 @@
-"""Webhook endpoints for Telegram, KIE callbacks, and YooKassa."""
+"""Webhook endpoints for Telegram and KIE callbacks."""
 
-import asyncio
 import base64
 import hashlib
 import hmac
-import ipaddress
 import time
 from typing import Any
 
@@ -15,19 +13,6 @@ from loguru import logger
 from pydantic import ValidationError
 from services.generation import process_kie_result
 from services.kie.schemas import TaskStatusResponse
-from services.payment import process_yookassa_notification
-
-# YooKassa trusted IP ranges
-# https://yookassa.ru/developers/using-api/webhooks
-YOOKASSA_IP_NETWORKS = [
-    ipaddress.ip_network("185.71.76.0/27"),
-    ipaddress.ip_network("185.71.77.0/27"),
-    ipaddress.ip_network("77.75.153.0/25"),
-    ipaddress.ip_network("77.75.156.11/32"),
-    ipaddress.ip_network("77.75.156.35/32"),
-    ipaddress.ip_network("77.75.154.128/25"),
-    ipaddress.ip_network("2a02:5180::/32"),
-]
 
 router = APIRouter(tags=["webhook"])
 
@@ -180,53 +165,5 @@ async def kie_callback(
         return {"ok": True}
 
     background_tasks.add_task(process_kie_result, task_id, response.data)
-
-    return {"ok": True}
-
-
-def _is_yookassa_ip(ip_str: str) -> bool:
-    """Check if IP address belongs to YooKassa trusted ranges."""
-    try:
-        addr = ipaddress.ip_address(ip_str)
-        return any(addr in network for network in YOOKASSA_IP_NETWORKS)
-    except ValueError:
-        return False
-
-
-@router.post("/webhook/yookassa")
-async def yookassa_webhook(request: Request) -> dict[str, bool]:
-    """Handle YooKassa payment notifications.
-
-    Verifies the request comes from YooKassa IP ranges,
-    then processes the payment notification asynchronously.
-    """
-    # Prefer the client IP supplied by the trusted reverse proxy.
-    client_ip = request.headers.get("X-Real-IP")
-    if not client_ip:
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
-        else:
-            client_ip = request.client.host if request.client else "unknown"
-
-    # Verify IP
-    if not _is_yookassa_ip(client_ip):
-        logger.warning(f"YooKassa webhook rejected: untrusted IP {client_ip}")
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    body = await request.json()
-    logger.debug(f"YooKassa webhook payload: {body}")
-
-    event = body.get("event")
-    payment_object = body.get("object", {})
-    yookassa_payment_id = payment_object.get("id")
-
-    if not event or not yookassa_payment_id:
-        logger.warning("YooKassa webhook: missing event or object.id")
-        return {"ok": True}
-
-    asyncio.create_task(
-        process_yookassa_notification(event, yookassa_payment_id, payment_object)
-    )
 
     return {"ok": True}

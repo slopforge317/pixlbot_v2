@@ -1,20 +1,19 @@
 """Payment API schemas."""
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class CreatePaymentRequest(BaseModel):
     """Request to create a payment for a credit package."""
 
     credit_package_id: int
-    email: EmailStr
 
 
 class CreatePaymentResponse(BaseModel):
     """Response with payment info and YooKassa redirect URL."""
 
     payment_id: int
-    confirmation_url: str
+    invoice_message_id: int
 
 
 class PaymentStatusResponse(BaseModel):

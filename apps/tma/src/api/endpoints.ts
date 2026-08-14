@@ -103,7 +103,7 @@ export function getPackages(): Promise<CreditPackageListResponse> {
 // =============================================================================
 
 /**
- * Create a payment for a credit package
+ * Create a payment and send a Telegram invoice to the user's chat
  * POST /api/payments
  */
 export function createPayment(
